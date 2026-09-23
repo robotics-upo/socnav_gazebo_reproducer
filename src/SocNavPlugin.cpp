@@ -5,6 +5,10 @@
 #include <map>
 #include <set>
 #include <cmath>
+#include <filesystem>
+#include <gazebo/transport/transport.hh>
+#include <gazebo/msgs/msgs.hh>
+
 
 namespace socnav_gazebo_reproducer
 {
@@ -60,6 +64,12 @@ public:
   static constexpr double kHumanSmoothingTime = 0.12; // s
 
   std::string robot_name = "robot";
+
+  // Nodes and publishers for Gazebo Transport
+  gazebo::transport::NodePtr gz_node;
+  gazebo::transport::PublisherPtr record_pub;
+  bool is_recording = false;
+  std::string json_path;
   
   void OnUpdate(const gazebo::common::UpdateInfo& _info);
   void ApplyStep(const TrajectoryStep& step, double dt);
@@ -94,17 +104,17 @@ void SocNavPlugin::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr _sdf)
     impl_->robot_name = _sdf->Get<std::string>("robot_name");
   }
 
-  std::string json_path = "";
+  impl_->json_path = "";
   if (_sdf->HasElement("trajectory_file")) {
-    json_path = _sdf->Get<std::string>("trajectory_file");
+    impl_->json_path = _sdf->Get<std::string>("trajectory_file");
   } else {
     RCLCPP_ERROR(impl_->rosnode->get_logger(), "No <trajectory_file> provided!");
     return;
   }
 
-  std::ifstream f(json_path);
+  std::ifstream f(impl_->json_path);
   if (!f.is_open()) {
-    RCLCPP_ERROR(impl_->rosnode->get_logger(), "Could not open file: %s", json_path.c_str());
+    RCLCPP_ERROR(impl_->rosnode->get_logger(), "Could not open file: %s", impl_->json_path.c_str());
     return;
   }
 
@@ -187,6 +197,15 @@ void SocNavPlugin::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr _sdf)
 
   // Register custom trajectory (walking animation) for each actor once.
   impl_->SetupActorAnimations();
+
+
+  // Initialize Gazebo Transport Node
+  impl_->gz_node = gazebo::transport::NodePtr(new gazebo::transport::Node());
+  impl_->gz_node->Init(impl_->world->Name());
+
+  // Publish to the record video topic
+  impl_->record_pub = impl_->gz_node->Advertise<gazebo::msgs::GzString>("~/record_video");
+
 }
 
 void SocNavPlugin::Reset()
@@ -232,6 +251,23 @@ void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
 {
   if (!is_loaded || trajectory_steps.empty()) return;
 
+
+  // Start recording on the first frame if it hasn't started yet
+  if (!is_recording && record_pub) {
+
+    // Get the path of the JSON provided in the SDF and change extension to .mp4
+    std::filesystem::path json_p(json_path);
+    std::filesystem::path video_p = json_p;
+    video_p.replace_extension(".mp4"); // Change /path/file.json -> /path/file.mp4
+
+    gazebo::msgs::GzString msg;
+    msg.set_data(video_p.string()); // Send the video file path to the GUI plugin
+    record_pub->Publish(msg);
+    is_recording = true;
+    RCLCPP_INFO(rosnode->get_logger(), 
+      "Recording video signal sent. Stored in: %s", video_p.c_str());
+  }
+
   double sim_time = _info.simTime.Double();
 
   // Compute dt since last tick (clamped to avoid a huge first-frame jump)
@@ -262,6 +298,16 @@ void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
 
   // Always apply poses every physics tick (actors snap back without this).
   ApplyStep(trajectory_steps[current_step_idx], dt);
+
+
+  // stop recording when the trajectory is completed
+  if (current_step_idx >= trajectory_steps.size() - 1 && is_recording) {
+    gazebo::msgs::GzString msg;
+    msg.set_data("stop");
+    record_pub->Publish(msg);
+    is_recording = false;
+    RCLCPP_INFO(rosnode->get_logger(), "Stop recording video signal sent.");
+  }
 }
 
 void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)

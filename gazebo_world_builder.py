@@ -17,6 +17,9 @@ def create_world(json_path, output_path):
     world_template = f"""<?xml version='1.0'?>
 <sdf version='1.7'>
   <world name='default'>
+    <gui name="default_gui">
+      <plugin name="AutoRRecordGuiPlugin" filename="libAutoRecordGuiPlugin.so"/>
+    </gui>
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
       <trajectory_file>{json_path}</trajectory_file>
@@ -39,6 +42,13 @@ def create_world(json_path, output_path):
         <falloff>0</falloff>
       </spot>
     </light>
+    <gui fullscreen='0'>
+      <camera name='user_camera'>
+        <pose>9.05907 4.1081 10.8863 0 0.915644 -2.94299</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui>
     <model name='ground_plane'>
       <static>1</static>
       <link name='link'>
