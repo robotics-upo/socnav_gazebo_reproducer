@@ -1,9 +1,16 @@
 <?xml version='1.0'?>
 <sdf version='1.7'>
   <world name='default'>
+    <gui>
+      <camera name='user_camera'>
+        <pose>9.05907 4.1081 10.8863 0 0.915644 -2.94299</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui>
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
-      <trajectory_file>/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/SocNav3_trajectories_labeled/src1/000000317_861dba1c.json</trajectory_file>
+      <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories_labeled/src1/000000005_cd50de3f.json</trajectory_file>
     </plugin>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
@@ -95,13 +102,13 @@
       <heading_deg>0</heading_deg>
     </spherical_coordinates>
     <model name='robot'>
-      <pose>3.413650400837062 2.827158113516684 0.25 0 0 -0.544799327204396</pose>
+      <pose>-1.639839053748613 2.2648174664419365 0.5 0 0 -1.551712790910049</pose>
       <link name='link'>
         <collision name='collision'>
           <geometry>
             <cylinder>
               <radius>0.25</radius>
-              <length>0.5</length>
+              <length>1.0</length>
             </cylinder>
           </geometry>
         </collision>
@@ -109,7 +116,7 @@
           <geometry>
             <cylinder>
               <radius>0.25</radius>
-              <length>0.5</length>
+              <length>1.0</length>
             </cylinder>
           </geometry>
           <material>
@@ -117,10 +124,36 @@
             <diffuse>0.1 0.4 0.8 1</diffuse>
           </material>
         </visual>
+        <visual name='robot_top'>
+          <pose>0 0 0.58 0 0 0</pose>
+          <geometry><cylinder><radius>0.18</radius><length>0.16</length></cylinder></geometry>
+          <material><ambient>0.04 0.08 0.12 1</ambient><diffuse>0.04 0.08 0.12 1</diffuse></material>
+        </visual>
+        <visual name='robot_front'>
+          <pose>0.21 0 0.44 0 0 0</pose>
+          <geometry><box><size>0.12 0.32 0.24</size></box></geometry>
+          <material><ambient>0.9 0.12 0.08 1</ambient><diffuse>0.9 0.12 0.08 1</diffuse></material>
+        </visual>
+        <visual name='robot_sensor'>
+          <pose>0 0 0.78 0 0 0</pose>
+          <geometry><cylinder><radius>0.035</radius><length>0.24</length></cylinder></geometry>
+          <material><ambient>0.1 0.9 0.9 1</ambient><diffuse>0.1 0.9 0.9 1</diffuse></material>
+        </visual>
       </link>
     </model>
     <actor name="person_17">
-      <pose>-1.5465037969500495 1.8234972361474708 1.25 0 0 4.74019529686986</pose>
+      <pose>-0.22107224777112855 1.9083313764689467 1.25 0 0 3.169457803964968</pose>
+      <skin>
+        <filename>elegant_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_18">
+      <pose>-1.1269232519653212 1.6473683354401611 1.25 0 0 2.0107899688936035</pose>
       <skin>
         <filename>elegant_man.dae</filename>
         <scale>1</scale>

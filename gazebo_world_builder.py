@@ -17,8 +17,12 @@ def create_world(json_path, output_path):
     world_template = f"""<?xml version='1.0'?>
 <sdf version='1.7'>
   <world name='default'>
-    <gui name="default_gui">
-      <plugin name="AutoRRecordGuiPlugin" filename="libAutoRecordGuiPlugin.so"/>
+    <gui>
+      <camera name='user_camera'>
+        <pose>9.05907 4.1081 10.8863 0 0.915644 -2.94299</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
     </gui>
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
@@ -42,13 +46,6 @@ def create_world(json_path, output_path):
         <falloff>0</falloff>
       </spot>
     </light>
-    <gui fullscreen='0'>
-      <camera name='user_camera'>
-        <pose>9.05907 4.1081 10.8863 0 0.915644 -2.94299</pose>
-        <view_controller>orbit</view_controller>
-        <projection_type>perspective</projection_type>
-      </camera>
-    </gui>
     <model name='ground_plane'>
       <static>1</static>
       <link name='link'>
@@ -135,7 +132,7 @@ def create_world(json_path, output_path):
         robot_angle = robot.get('angle', 0.0)
         robot_width = robot_shape.get('width', 0.5)
         robot_length = robot_shape.get('length', robot_width)
-        robot_height = max(robot_width, robot_length)
+        robot_height = 1.0 #max(robot_width, robot_length)
 
         if robot_type == 'circle':
             robot_geometry = f"""            <cylinder>
@@ -167,6 +164,21 @@ def create_world(json_path, output_path):
             <ambient>0.1 0.4 0.8 1</ambient>
             <diffuse>0.1 0.4 0.8 1</diffuse>
           </material>
+        </visual>
+        <visual name='robot_top'>
+          <pose>0 0 {robot_height * 0.58} 0 0 0</pose>
+          <geometry><cylinder><radius>{min(robot_length, robot_width) * 0.36}</radius><length>{robot_height * 0.16}</length></cylinder></geometry>
+          <material><ambient>0.04 0.08 0.12 1</ambient><diffuse>0.04 0.08 0.12 1</diffuse></material>
+        </visual>
+        <visual name='robot_front'>
+          <pose>{robot_length * 0.42} 0 {robot_height * 0.44} 0 0 0</pose>
+          <geometry><box><size>{robot_length * 0.24} {robot_width * 0.64} {robot_height * 0.24}</size></box></geometry>
+          <material><ambient>0.9 0.12 0.08 1</ambient><diffuse>0.9 0.12 0.08 1</diffuse></material>
+        </visual>
+        <visual name='robot_sensor'>
+          <pose>0 0 {robot_height * 0.78} 0 0 0</pose>
+          <geometry><cylinder><radius>{min(robot_length, robot_width) * 0.07}</radius><length>{robot_height * 0.24}</length></cylinder></geometry>
+          <material><ambient>0.1 0.9 0.9 1</ambient><diffuse>0.1 0.9 0.9 1</diffuse></material>
         </visual>
       </link>
     </model>

@@ -6,6 +6,10 @@
 #include <set>
 #include <cmath>
 #include <filesystem>
+#include <thread>
+#include <chrono>
+#include <csignal>
+#include <gazebo/gazebo.hh>
 #include <gazebo/transport/transport.hh>
 #include <gazebo/msgs/msgs.hh>
 
@@ -21,6 +25,14 @@ struct HumanState {
   double x, y, theta;
   double speed = 0.0; // linear speed [m/s], computed from consecutive positions
 };
+struct GoalState {
+  double x = 0.0;
+  double y = 0.0;
+  double angle = 0.0;
+  double pos_threshold = 0.1;
+  double angle_threshold = 0.1;
+  bool valid = false;
+};
 struct SmoothedHumanState {
   double x = 0.0;
   double y = 0.0;
@@ -31,6 +43,7 @@ struct TrajectoryStep {
   double timestamp;
   RobotState robot;
   std::vector<HumanState> people;
+  GoalState goal;
 };
 
 class SocNavPluginPrivate
@@ -64,15 +77,29 @@ public:
   static constexpr double kHumanSmoothingTime = 0.12; // s
 
   std::string robot_name = "robot";
+  gazebo::physics::ModelPtr goal_area_model;
+  gazebo::physics::ModelPtr goal_direction_model;
+  bool goal_models_requested = false;
 
   // Nodes and publishers for Gazebo Transport
   gazebo::transport::NodePtr gz_node;
   gazebo::transport::PublisherPtr record_pub;
+  gazebo::transport::SubscriberPtr record_status_sub;
   bool is_recording = false;
+  bool start_ack_received = false;
+  bool recording_finished = false;
+  bool stop_ack_received = false;
+  bool shutdown_requested = false;
+  double recording_signal_time = -1.0;
+  double last_start_signal_time = -1.0;
+  double stop_signal_time = -1.0;
   std::string json_path;
   
   void OnUpdate(const gazebo::common::UpdateInfo& _info);
+  void OnRecordStatus(ConstGzStringPtr &_msg);
   void ApplyStep(const TrajectoryStep& step, double dt);
+  void ApplyGoal(const GoalState& goal);
+  void EnsureGoalModels();
   void SetupActorAnimations();
   
   inline double normalizeAngle(double a)
@@ -144,6 +171,21 @@ void SocNavPlugin::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr _sdf)
       step.robot.x = robot_json["x"].get<double>();
       step.robot.y = robot_json["y"].get<double>();
       step.robot.theta = robot_json["angle"].get<double>();
+
+      if (item.contains("goal") && item["goal"].is_object()) {
+        const auto& goal_json = item["goal"];
+        if (goal_json.contains("x") && goal_json.contains("y") &&
+            goal_json.contains("angle")) {
+          step.goal.x = goal_json["x"].get<double>();
+          step.goal.y = goal_json["y"].get<double>();
+          step.goal.angle = goal_json["angle"].get<double>();
+          if (goal_json.contains("pos_threshold"))
+            step.goal.pos_threshold = goal_json["pos_threshold"].get<double>();
+          if (goal_json.contains("angle_threshold"))
+            step.goal.angle_threshold = goal_json["angle_threshold"].get<double>();
+          step.goal.valid = true;
+        }
+      }
       
       auto& people_json = item["people"];
       for (auto& person_json : people_json) {
@@ -205,6 +247,8 @@ void SocNavPlugin::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr _sdf)
 
   // Publish to the record video topic
   impl_->record_pub = impl_->gz_node->Advertise<gazebo::msgs::GzString>("~/record_video");
+  impl_->record_status_sub = impl_->gz_node->Subscribe(
+    "~/record_video_status", &SocNavPluginPrivate::OnRecordStatus, impl_.get());
 
 }
 
@@ -212,8 +256,30 @@ void SocNavPlugin::Reset()
 {
   impl_->current_step_idx = 0;
   impl_->last_sim_time = -1.0;
+  impl_->is_recording = false;
+  impl_->start_ack_received = false;
+  impl_->recording_finished = false;
+  impl_->stop_ack_received = false;
+  impl_->shutdown_requested = false;
+  impl_->recording_signal_time = -1.0;
+  impl_->last_start_signal_time = -1.0;
+  impl_->stop_signal_time = -1.0;
   impl_->actor_script_time.clear();
   impl_->smoothed_humans.clear();
+}
+
+void SocNavPluginPrivate::OnRecordStatus(ConstGzStringPtr &_msg)
+{
+  RCLCPP_INFO(rosnode->get_logger(),
+    "Recording GUI status received: %s", _msg->data().c_str());
+  if (_msg->data() == "stopped")
+    stop_ack_received = true;
+  else if (_msg->data() == "started") {
+    start_ack_received = true;
+    is_recording = true;
+    recording_signal_time = last_sim_time;
+    RCLCPP_INFO(rosnode->get_logger(), "Recording GUI confirmed video start.");
+  }
 }
 
 void SocNavPluginPrivate::SetupActorAnimations()
@@ -247,13 +313,88 @@ void SocNavPluginPrivate::SetupActorAnimations()
   }
 }
 
+void SocNavPluginPrivate::EnsureGoalModels()
+{
+  if (!goal_models_requested) {
+    const std::string area_sdf_xml = R"(<sdf version='1.6'>
+      <model name='socnav_goal_area'>
+        <static>true</static>
+        <link name='link'>
+          <visual name='visual'>
+            <geometry><cylinder><radius>1.0</radius><length>0.015</length></cylinder></geometry>
+            <material>
+              <ambient>0.1 0.8 0.1 1</ambient>
+              <diffuse>0.1 0.8 0.1 1</diffuse>
+              <transparency>0.55</transparency>
+            </material>
+          </visual>
+        </link>
+      </model>
+    </sdf>)";
+    const std::string direction_sdf_xml = R"(<sdf version='1.6'>
+      <model name='socnav_goal_direction'>
+        <static>true</static>
+        <link name='link'>
+          <visual name='visual'>
+            <pose>0.5 0 0.025 0 0 0</pose>
+            <geometry><box><size>1.0 0.05 0.05</size></box></geometry>
+            <material>
+              <ambient>0.9 0.1 0.1 1</ambient>
+              <diffuse>0.9 0.1 0.1 1</diffuse>
+            </material>
+          </visual>
+        </link>
+      </model>
+    </sdf>)";
+
+    sdf::SDF area_sdf;
+    sdf::SDF direction_sdf_data;
+    area_sdf.SetFromString(area_sdf_xml);
+    direction_sdf_data.SetFromString(direction_sdf_xml);
+    if (!area_sdf.Root() || !direction_sdf_data.Root()) {
+      RCLCPP_ERROR(rosnode->get_logger(), "Could not parse goal marker SDF.");
+      goal_models_requested = true;
+      return;
+    }
+    world->InsertModelSDF(area_sdf);
+    world->InsertModelSDF(direction_sdf_data);
+    goal_models_requested = true;
+  }
+
+  if (!goal_area_model)
+    goal_area_model = world->ModelByName("socnav_goal_area");
+  if (!goal_direction_model)
+    goal_direction_model = world->ModelByName("socnav_goal_direction");
+}
+
+void SocNavPluginPrivate::ApplyGoal(const GoalState& goal)
+{
+  if (!goal.valid) return;
+  EnsureGoalModels();
+
+  const double radius = std::max(0.05, goal.pos_threshold);
+  if (goal_area_model) {
+    goal_area_model->SetWorldPose(
+      ignition::math::Pose3d(goal.x, goal.y, 0.01, 0, 0, 0));
+    goal_area_model->SetScale(ignition::math::Vector3d(radius, radius, 1.0), true);
+  }
+  if (goal_direction_model) {
+    goal_direction_model->SetWorldPose(
+      ignition::math::Pose3d(goal.x, goal.y, 0.0, 0, 0, goal.angle));
+  }
+}
+
 void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
 {
   if (!is_loaded || trajectory_steps.empty()) return;
 
+  double sim_time = _info.simTime.Double();
 
   // Start recording on the first frame if it hasn't started yet
-  if (!is_recording && record_pub) {
+  if (record_pub && !recording_finished && !start_ack_received &&
+      sim_time >= 0.5 &&
+      (last_start_signal_time < 0.0 ||
+       sim_time - last_start_signal_time >= 0.5)) {
 
     // Get the path of the JSON provided in the SDF and change extension to .mp4
     std::filesystem::path json_p(json_path);
@@ -263,12 +404,11 @@ void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
     gazebo::msgs::GzString msg;
     msg.set_data(video_p.string()); // Send the video file path to the GUI plugin
     record_pub->Publish(msg);
-    is_recording = true;
+    last_start_signal_time = sim_time;
     RCLCPP_INFO(rosnode->get_logger(), 
-      "Recording video signal sent. Stored in: %s", video_p.c_str());
+      "Recording video START signal sent on ~/record_video (t=%.2f s); waiting for GUI acknowledgment. Stored in: %s",
+      sim_time, video_p.c_str());
   }
-
-  double sim_time = _info.simTime.Double();
 
   // Compute dt since last tick (clamped to avoid a huge first-frame jump)
   double dt = (last_sim_time < 0.0) ? 0.0 : sim_time - last_sim_time;
@@ -289,7 +429,7 @@ void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
     }
   }
 
-  if (step_changed && (current_step_idx + 1) % 10 == 0) {
+  if (step_changed && (current_step_idx + 1) % 20 == 0) {
     RCLCPP_INFO(rosnode->get_logger(),
       "Trajectory step %zu / %zu  (rel_t=%.3f s)",
       current_step_idx + 1, total_steps,
@@ -298,15 +438,38 @@ void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
 
   // Always apply poses every physics tick (actors snap back without this).
   ApplyStep(trajectory_steps[current_step_idx], dt);
+  ApplyGoal(trajectory_steps[current_step_idx].goal);
 
 
   // stop recording when the trajectory is completed
-  if (current_step_idx >= trajectory_steps.size() - 1 && is_recording) {
+  if (current_step_idx >= trajectory_steps.size() - 1 && start_ack_received &&
+      is_recording &&
+      sim_time - recording_signal_time >= 0.5) {
     gazebo::msgs::GzString msg;
     msg.set_data("stop");
     record_pub->Publish(msg);
     is_recording = false;
-    RCLCPP_INFO(rosnode->get_logger(), "Stop recording video signal sent.");
+    recording_finished = true;
+    stop_signal_time = sim_time;
+    RCLCPP_INFO(rosnode->get_logger(),
+      "Recording video STOP signal sent on ~/record_video.");
+  }
+
+  // Give the GUI video encoder time to finalize the MP4 before shutting down.
+  if (recording_finished && stop_signal_time >= 0.0 && stop_ack_received &&
+      !shutdown_requested) {
+    RCLCPP_INFO(rosnode->get_logger(),
+      "Recording GUI confirmed MP4 finalization; scheduling Gazebo shutdown.");
+    stop_signal_time = -1.0;
+    shutdown_requested = true;
+
+    // Do not shut down from the world-update callback. Gazebo waits for this
+    // callback to return while shutting down. The SIGINT is sent only after
+    // the GUI has acknowledged that SaveVideo() completed.
+    std::thread([] {
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+      std::raise(SIGINT);
+    }).detach();
   }
 }
 
