@@ -12,6 +12,7 @@
   <depend>rclcpp</depend>
   <depend>nlohmann-json-dev</depend>
   <depend>gazebo_ros</depend>
+  <exec_depend>hunav_gazebo_wrapper</exec_depend>
   <depend>hunav_msgs</depend>
   <depend>tf2_geometry_msgs</depend>
   <depend>tf2</depend>

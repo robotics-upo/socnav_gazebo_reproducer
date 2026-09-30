@@ -3,7 +3,7 @@
   <world name='default'>
     <gui>
       <camera name='user_camera'>
-        <pose>9.05907 4.1081 10.8863 0 0.915644 -2.94299</pose>
+        <pose>1.3647896656668146 2.503721498486378 20.427217052063074 1.0469676511351569 1.5707963267948966 0</pose>
         <view_controller>orbit</view_controller>
         <projection_type>perspective</projection_type>
       </camera>
@@ -67,8 +67,8 @@
           </geometry>
           <material>
             <script>
-              <uri>file://media/materials/scripts/gazebo.material</uri>
-              <name>Gazebo/Grey</name>
+              <uri>file://media/materials/scripts/kitchen.material</uri>
+              <name>Kitchen/CounterTop_H</name>
             </script>
           </material>
         </visual>
@@ -155,7 +155,7 @@
     <actor name="person_18">
       <pose>1.248873708908706 -0.8652302783708717 1.25 0 0 3.032638102233302</pose>
       <skin>
-        <filename>elegant_man.dae</filename>
+        <filename>casual_man.dae</filename>
         <scale>1</scale>
       </skin>
       <animation name="walking">
@@ -163,6 +163,505 @@
         <scale>1.0</scale>
       </animation>
     </actor>
+    <model name="static_object_0">
+      <static>true</static>
+      <pose>2.2117999999999998 7.328799999999999 0.9 0 0 -1.0500036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.7 0.25 1.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+
+          <geometry>
+            <box>
+              <size>0.7 0.25 1.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.36 0.2 1</ambient>
+            <diffuse>0.55 0.36 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_1">
+      <static>true</static>
+      <pose>0.6058 6.323799999999999 0.9 0 0 -1.0500036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.7 0.25 1.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+
+          <geometry>
+            <box>
+              <size>0.7 0.25 1.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.36 0.2 1</ambient>
+            <diffuse>0.55 0.36 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_2">
+      <static>true</static>
+      <pose>-0.9248 5.3435999999999995 0.9 0 0 -1.0500036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.7 0.25 1.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+
+          <geometry>
+            <box>
+              <size>0.7 0.25 1.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.36 0.2 1</ambient>
+            <diffuse>0.55 0.36 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_3">
+      <static>true</static>
+      <pose>-2.0494 4.725 0.9 0 0 -1.0500036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.7 0.25 1.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+
+          <geometry>
+            <box>
+              <size>0.7 0.25 1.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.36 0.2 1</ambient>
+            <diffuse>0.55 0.36 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_4">
+      <static>true</static>
+      <pose>-0.6322 -0.5222 0.9 0 0 3.6623863267948966</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.9 0.35 1.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+
+          <geometry>
+            <box>
+              <size>0.9 0.35 1.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.36 0.2 1</ambient>
+            <diffuse>0.55 0.36 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_5">
+      <static>true</static>
+      <pose>4.19 4.185 0.9 0 0 0.5207963267948965</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.51 1.75 1.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+
+          <geometry>
+            <box>
+              <size>0.51 1.75 1.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.36 0.2 1</ambient>
+            <diffuse>0.55 0.36 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_6">
+      <static>true</static>
+      <pose>5.487100000000001 1.9614 0.3 0 0 0.3707963267948966</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.1 1.4 0.6</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+
+          <geometry>
+            <box>
+              <size>0.1 1.4 0.6</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.08 0.08 0.08 1</ambient>
+            <diffuse>0.08 0.08 0.08 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_7">
+      <static>true</static>
+      <pose>-0.9999999999999999 -0.16 0.375 0 0 0.5207963267948965</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.7 1.75 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>1.0 0.9722222222222222 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_8">
+      <static>true</static>
+      <pose>-1.88 1.3699999999999999 0.375 0 0 0.5207963267948965</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.7 1.75 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>1.0 0.9722222222222222 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_9">
+      <static>true</static>
+      <pose>-2.77 2.89 0.375 0 0 0.5207963267948965</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.7 1.75 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>1.0 0.9722222222222222 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_10">
+      <static>true</static>
+      <pose>-2.85 4.38 0.375 0 0 -1.0492036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.65 1.2 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>0.9285714285714287 0.6666666666666666 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_11">
+      <static>true</static>
+      <pose>-1.78 4.9799999999999995 0.375 0 0 -1.0492036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.65 1.2 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>0.9285714285714287 0.6666666666666666 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_12">
+      <static>true</static>
+      <pose>-0.708 5.6 0.375 0 0 -1.0492036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.65 1.2 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>0.9285714285714287 0.6666666666666666 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_13">
+      <static>true</static>
+      <pose>0.35 6.2299999999999995 0.375 0 0 -1.0492036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.65 1.2 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>0.9285714285714287 0.6666666666666666 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_14">
+      <static>true</static>
+      <pose>1.88 7.13 0.375 0 0 -1.0492036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.65 1.2 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>0.9285714285714287 0.6666666666666666 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_15">
+      <static>true</static>
+      <pose>0.65 -2.07 0.9 0 0 -1.0492036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.5 2 1.8</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+
+          <geometry>
+            <box>
+              <size>0.5 2 1.8</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.55 0.36 0.2 1</ambient>
+            <diffuse>0.55 0.36 0.2 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_16">
+      <static>true</static>
+      <pose>3.686 -0.164 0.375 0 0 -1.0492036732051035</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.75 4.8 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>1.0714285714285714 2.6666666666666665 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_17">
+      <static>true</static>
+      <pose>1.3500718441376454 2.6736909562985804 0.45 0 0 -2.543092147335182</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.48 0.43 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>1.097779348354428 0.908079933909351 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_18">
+      <static>true</static>
+      <pose>1.6470823026304355 2.1664726909297904 0.45 0 0 -2.5520456382383405</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.48 0.43 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>1.097779348354428 0.908079933909351 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_19">
+      <static>true</static>
+      <pose>1.1218155709347988 3.2548215608974056 0.375 0 0 -2.463804526131911</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.42 0.75 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>0.6 0.41666666666666663 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_20">
+      <static>true</static>
+      <pose>-0.43237236512239696 4.38488563515217 0.375 0 0 -6.630324085514661</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.42 0.75 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>0.6 0.41666666666666663 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
     <model name='simple_world_test'>
       <pose>0 0 0 0 -0 0</pose>
       <link name='Wall_0'>
