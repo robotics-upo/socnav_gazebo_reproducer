@@ -22,11 +22,29 @@ From the workspace root, preview the worlds selected by the survey CSV files:
 python3 src/socnav_gazebo_reproducer/generate_survey_worlds.py --dry-run
 ```
 
-Run the command without `--dry-run` to generate worlds in
-`src/socnav_gazebo_reproducer/worlds`. Rows without a matching JSON, or with
-multiple JSON files sharing the same numeric prefix, are reported and skipped
-by default. Use `--first-match` to select the first matching JSON path in sorted
-order for duplicate prefixes.
+The script reads CSV files from
+`/home/hunav_gz_classic_ws/SocNav3_trajectories/index_trajectories_survey` by
+default. Each CSV must contain a `file` column with video filenames such as
+`000000001.mp4`. It looks for the matching `000000001.json` in the `src1`
+through `src6` directories under
+`/home/hunav_gz_classic_ws/SocNav3_trajectories`.
+
+Run without `--dry-run` to generate worlds in
+`src/socnav_gazebo_reproducer/worlds/survey_worlds`, named after their video
+IDs (for example, `000000001.world`). Use `--csv-dir`, `--json-dir`, and
+`--output-dir` to override the CSV directory, dataset directory, and output
+directory. For example:
+
+```
+python3 src/socnav_gazebo_reproducer/generate_survey_worlds.py \
+  --csv-dir /path/to/csvs \
+  --json-dir /path/to/SocNav3_trajectories \
+  --output-dir /path/to/survey_worlds
+```
+
+IDs without a matching JSON, or with matching JSON files in multiple source
+directories, are reported and skipped by default. Use `--first-match` to select
+the first matching JSON path in sorted order for duplicate IDs.
 
 ### socnav_plugin
 
@@ -35,7 +53,7 @@ Yhe world builder will add the socnav_plugin to the created world file and speci
 ```xml
 <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
   <robot_name>robot</robot_name>
-  <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories_labeled/src3/000001054_7d43a964.json</trajectory_file>
+  <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src3/000000001.json</trajectory_file>
 </plugin>
 ```
 

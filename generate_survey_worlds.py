@@ -9,22 +9,15 @@ from pathlib import Path
 
 
 VIDEO_PATTERN = re.compile(r"(?P<number>\d+)\.mp4$", re.IGNORECASE)
-JSON_PATTERN = re.compile(r"(?P<number>\d+)_.*\.json$", re.IGNORECASE)
+JSON_PATTERN = re.compile(r"(?P<number>\d+)\.json$", re.IGNORECASE)
 
-
-def find_workspace_root(explicit_root=None):
-    if explicit_root is not None:
-        return explicit_root.resolve()
-
-    for candidate in Path(__file__).resolve().parents:
-        survey_dir = candidate / "SocNav3_trajectories_labeled" / "index_trajectories_survey"
-        builder = candidate / "src" / "socnav_gazebo_reproducer" / "gazebo_world_builder.py"
-        if survey_dir.is_dir() and builder.is_file():
-            return candidate
-
-    raise FileNotFoundError(
-        "Could not find workspace root; pass --workspace-root explicitly"
-    )
+DEFAULT_CSV_DIR = Path(
+    "/home/hunav_gz_classic_ws/SocNav3_trajectories/index_trajectories_survey"
+)
+DEFAULT_JSON_DIR = Path("/home/hunav_gz_classic_ws/SocNav3_trajectories")
+DEFAULT_OUTPUT_DIR = Path(
+    "/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/worlds/survey_worlds"
+)
 
 
 def read_video_numbers(survey_dir):
@@ -72,9 +65,22 @@ def main():
         description="Generate Gazebo worlds for videos listed in the survey CSVs."
     )
     parser.add_argument(
-        "--workspace-root",
+        "--csv-dir",
         type=Path,
-        help="Workspace containing SocNav3_trajectories_labeled and src/",
+        default=DEFAULT_CSV_DIR,
+        help=f"Directory containing survey CSV files (default: {DEFAULT_CSV_DIR})",
+    )
+    parser.add_argument(
+        "--json-dir",
+        type=Path,
+        default=DEFAULT_JSON_DIR,
+        help=f"Dataset directory containing src1 through src6 (default: {DEFAULT_JSON_DIR})",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=DEFAULT_OUTPUT_DIR,
+        help=f"Directory for generated world files (default: {DEFAULT_OUTPUT_DIR})",
     )
     parser.add_argument(
         "--first-match",
@@ -89,14 +95,11 @@ def main():
     args = parser.parse_args()
 
     try:
-        workspace_root = find_workspace_root(args.workspace_root)
-        dataset_dir = workspace_root / "SocNav3_trajectories_labeled"
-        survey_dir = dataset_dir / "index_trajectories_survey"
-        package_dir = workspace_root / "src" / "socnav_gazebo_reproducer"
-        builder = package_dir / "gazebo_world_builder.py"
-        output_dir = package_dir / "worlds"
+        dataset_dir = args.json_dir
+        builder = Path(__file__).resolve().parent / "gazebo_world_builder.py"
+        output_dir = args.output_dir
 
-        csv_files, video_numbers, malformed_rows = read_video_numbers(survey_dir)
+        csv_files, video_numbers, malformed_rows = read_video_numbers(args.csv_dir)
         json_by_number = index_json_files(dataset_dir)
     except (FileNotFoundError, ValueError) as error:
         parser.error(str(error))

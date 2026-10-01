@@ -29,6 +29,7 @@ struct GoalState {
   double x = 0.0;
   double y = 0.0;
   double angle = 0.0;
+  double robot_footprint_radius = 0.25;
   double pos_threshold = 0.1;
   double angle_threshold = 0.1;
   bool valid = false;
@@ -78,6 +79,7 @@ public:
 
   std::string robot_name = "robot";
   gazebo::physics::ModelPtr goal_area_model;
+  gazebo::physics::ModelPtr goal_tolerance_model;
   gazebo::physics::ModelPtr goal_direction_model;
   bool goal_models_requested = false;
 
@@ -171,6 +173,15 @@ void SocNavPlugin::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr _sdf)
       step.robot.x = robot_json["x"].get<double>();
       step.robot.y = robot_json["y"].get<double>();
       step.robot.theta = robot_json["angle"].get<double>();
+      if (robot_json.contains("shape") && robot_json["shape"].is_object()) {
+        const auto& shape_json = robot_json["shape"];
+        const double width = shape_json.value("width", 0.5);
+        const double length = shape_json.value("length", width);
+        const std::string shape_type = shape_json.value("type", std::string{});
+        step.goal.robot_footprint_radius = shape_type == "circle"
+        ? std::max(width, length) / 2.0
+        : std::hypot(length, width) / 2.0;
+      }
 
       if (item.contains("goal") && item["goal"].is_object()) {
         const auto& goal_json = item["goal"];
@@ -331,6 +342,21 @@ void SocNavPluginPrivate::EnsureGoalModels()
         </link>
       </model>
     </sdf>)";
+    const std::string tolerance_sdf_xml = R"(<sdf version='1.6'>
+      <model name='socnav_goal_tolerance'>
+        <static>true</static>
+        <link name='link'>
+          <visual name='visual'>
+            <geometry><cylinder><radius>1.0</radius><length>0.015</length></cylinder></geometry>
+            <material>
+              <ambient>0.9 0.1 0.1 1</ambient>
+              <diffuse>0.9 0.1 0.1 1</diffuse>
+              <transparency>0.55</transparency>
+            </material>
+          </visual>
+        </link>
+      </model>
+    </sdf>)";
     const std::string direction_sdf_xml = R"(<sdf version='1.6'>
       <model name='socnav_goal_direction'>
         <static>true</static>
@@ -348,21 +374,26 @@ void SocNavPluginPrivate::EnsureGoalModels()
     </sdf>)";
 
     sdf::SDF area_sdf;
+    sdf::SDF tolerance_sdf;
     sdf::SDF direction_sdf_data;
     area_sdf.SetFromString(area_sdf_xml);
+    tolerance_sdf.SetFromString(tolerance_sdf_xml);
     direction_sdf_data.SetFromString(direction_sdf_xml);
-    if (!area_sdf.Root() || !direction_sdf_data.Root()) {
+    if (!area_sdf.Root() || !tolerance_sdf.Root() || !direction_sdf_data.Root()) {
       RCLCPP_ERROR(rosnode->get_logger(), "Could not parse goal marker SDF.");
       goal_models_requested = true;
       return;
     }
     world->InsertModelSDF(area_sdf);
+    world->InsertModelSDF(tolerance_sdf);
     world->InsertModelSDF(direction_sdf_data);
     goal_models_requested = true;
   }
 
   if (!goal_area_model)
     goal_area_model = world->ModelByName("socnav_goal_area");
+  if (!goal_tolerance_model)
+    goal_tolerance_model = world->ModelByName("socnav_goal_tolerance");
   if (!goal_direction_model)
     goal_direction_model = world->ModelByName("socnav_goal_direction");
 }
@@ -372,11 +403,19 @@ void SocNavPluginPrivate::ApplyGoal(const GoalState& goal)
   if (!goal.valid) return;
   EnsureGoalModels();
 
+  constexpr double marker_thickness = 0.015;
   const double radius = std::max(0.05, goal.pos_threshold);
+  const double footprint_radius = std::max(0.05, goal.robot_footprint_radius);
+  const double outer_radius = std::max(footprint_radius + 0.1, radius + 0.05);
   if (goal_area_model) {
     goal_area_model->SetWorldPose(
       ignition::math::Pose3d(goal.x, goal.y, 0.01, 0, 0, 0));
-    goal_area_model->SetScale(ignition::math::Vector3d(radius, radius, 1.0), true);
+    goal_area_model->SetScale(ignition::math::Vector3d(outer_radius, outer_radius, 1.0), true);
+  }
+  if (goal_tolerance_model) {
+    goal_tolerance_model->SetWorldPose(
+      ignition::math::Pose3d(goal.x, goal.y, marker_thickness + marker_thickness / 2.0, 0, 0, 0));
+    goal_tolerance_model->SetScale(ignition::math::Vector3d(radius, radius, 1.0), true);
   }
   if (goal_direction_model) {
     goal_direction_model->SetWorldPose(
