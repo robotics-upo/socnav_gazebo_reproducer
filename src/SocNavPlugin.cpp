@@ -38,6 +38,11 @@ struct SmoothedHumanState {
   double x = 0.0;
   double y = 0.0;
   double theta = 0.0;
+  double animation_window_x = 0.0;
+  double animation_window_y = 0.0;
+  double animation_window_elapsed = 0.0;
+  double animation_speed = 0.0;
+  bool animation_moving = false;
   bool initialized = false;
 };
 struct TrajectoryStep {
@@ -68,6 +73,12 @@ public:
   /// Filtered pose used to hide small, fast tracking fluctuations.
   std::map<int, SmoothedHumanState> smoothed_humans;
 
+  /// Human models are disabled after this many consecutive missing samples.
+  static constexpr size_t kMissingHumanSteps = 5;
+  std::set<int> human_ids;
+  std::map<int, size_t> human_last_seen_step;
+  std::map<int, bool> human_enabled;
+
   /// Simulation time at the last OnUpdate call (for dt computation).
   double last_sim_time = -1.0;
 
@@ -76,6 +87,11 @@ public:
 
   /// Time constant for the human pose low-pass filter.
   static constexpr double kHumanSmoothingTime = 0.12; // s
+
+  /// Animation speed is estimated from net motion over this window.
+  static constexpr double kAnimationMotionWindow = 0.4; // s
+  static constexpr double kAnimationStartSpeed = 0.10; // m/s
+  static constexpr double kAnimationStopSpeed = 0.05; // m/s
 
   std::string robot_name = "robot";
   gazebo::physics::ModelPtr goal_area_model;
@@ -277,6 +293,8 @@ void SocNavPlugin::Reset()
   impl_->stop_signal_time = -1.0;
   impl_->actor_script_time.clear();
   impl_->smoothed_humans.clear();
+  for (int id : impl_->human_ids)
+    impl_->human_last_seen_step[id] = impl_->trajectory_steps.size();
 }
 
 void SocNavPluginPrivate::OnRecordStatus(ConstGzStringPtr &_msg)
@@ -299,6 +317,11 @@ void SocNavPluginPrivate::SetupActorAnimations()
   std::set<int> ids;
   for (const auto& step : trajectory_steps) {
     for (const auto& p : step.people) ids.insert(p.id);
+  }
+  human_ids = ids;
+  for (int id : human_ids) {
+    human_last_seen_step[id] = trajectory_steps.size();
+    human_enabled[id] = true;
   }
 
   for (int id : ids) {
@@ -514,6 +537,36 @@ void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
 
 void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
 {
+  std::set<int> present_ids;
+  for (const auto& person : step.people)
+    present_ids.insert(person.id);
+
+  for (int id : human_ids) {
+    gazebo::physics::ModelPtr person_model = world->ModelByName("person_" + std::to_string(id));
+    if (!person_model) continue;
+
+    if (present_ids.count(id) > 0) {
+      human_last_seen_step[id] = current_step_idx;
+      if (!human_enabled[id]) {
+        person_model->SetEnabled(true);
+        human_enabled[id] = true;
+      }
+      continue;
+    }
+
+    const size_t last_seen = human_last_seen_step[id];
+    const size_t missing_steps = last_seen == trajectory_steps.size()
+      ? current_step_idx + 1
+      : current_step_idx - last_seen;
+    if (missing_steps >= kMissingHumanSteps && human_enabled[id]) {
+      ignition::math::Pose3d hidden_pose = person_model->WorldPose();
+      hidden_pose.Pos().Z(-1000.0);
+      person_model->SetWorldPose(hidden_pose);
+      person_model->SetEnabled(false);
+      human_enabled[id] = false;
+    }
+  }
+
   // ---- Robot ----
   gazebo::physics::ModelPtr robot_model = world->ModelByName(robot_name);
   if (robot_model) {
@@ -535,23 +588,23 @@ void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
         boost::dynamic_pointer_cast<gazebo::physics::Actor>(person_model);
 
     auto &smoothed = smoothed_humans[person.id];
-    double filtered_speed = 0.0;
     if (!smoothed.initialized || dt <= 0.0) {
       smoothed.x = person.x;
       smoothed.y = person.y;
       smoothed.theta = person.theta;
+      smoothed.animation_window_x = person.x;
+      smoothed.animation_window_y = person.y;
+      smoothed.animation_window_elapsed = 0.0;
+      smoothed.animation_speed = 0.0;
+      smoothed.animation_moving = false;
       smoothed.initialized = true;
     } else {
       const double alpha = 1.0 - std::exp(-dt / kHumanSmoothingTime);
-      const double previous_x = smoothed.x;
-      const double previous_y = smoothed.y;
 
       smoothed.x += alpha * (person.x - smoothed.x);
       smoothed.y += alpha * (person.y - smoothed.y);
       smoothed.theta = normalizeAngle(
         smoothed.theta + alpha * normalizeAngle(person.theta - smoothed.theta));
-
-      filtered_speed = std::hypot(smoothed.x - previous_x, smoothed.y - previous_y) / dt;
     }
 
     ignition::math::Pose3d pose = person_model->WorldPose();
@@ -570,9 +623,26 @@ void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
     person_model->SetWorldPose(pose);
 
     if (actor) {
-      // Advance the animation script time proportionally to the agent's speed.
+      smoothed.animation_window_elapsed += dt;
+      if (smoothed.animation_window_elapsed >= kAnimationMotionWindow) {
+        const double window_speed = std::hypot(
+          smoothed.x - smoothed.animation_window_x,
+          smoothed.y - smoothed.animation_window_y) /
+          smoothed.animation_window_elapsed;
+
+        if (smoothed.animation_moving) {
+          smoothed.animation_moving = window_speed > kAnimationStopSpeed;
+        } else {
+          smoothed.animation_moving = window_speed >= kAnimationStartSpeed;
+        }
+        smoothed.animation_speed = smoothed.animation_moving ? window_speed : 0.0;
+        smoothed.animation_window_x = smoothed.x;
+        smoothed.animation_window_y = smoothed.y;
+        smoothed.animation_window_elapsed = 0.0;
+      }
+
       // At kRefWalkSpeed the animation plays at 1× real speed.
-      double speed_ratio = filtered_speed / kRefWalkSpeed;
+      double speed_ratio = smoothed.animation_speed / kRefWalkSpeed;
       actor_script_time[person.id] += dt * speed_ratio;
 
       actor->SetScriptTime(actor_script_time[person.id]);
