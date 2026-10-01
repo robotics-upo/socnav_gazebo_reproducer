@@ -1,0 +1,248 @@
+<?xml version='1.0'?>
+<sdf version='1.7'>
+  <world name='default'>
+    <gui>
+      <camera name='user_camera'>
+        <pose>5.089967385043168 5.137964932650916 11.739829220764475 0.0 1.5707963267948966 0</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui>
+    <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
+      <robot_name>robot</robot_name>
+      <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src2/000000378.json</trajectory_file>
+    </plugin>
+    <light name='sun' type='directional'>
+      <cast_shadows>1</cast_shadows>
+      <pose>0 0 10 0 -0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
+    </light>
+    <model name='ground_plane'>
+      <static>1</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>100</mu>
+                <mu2>50</mu2>
+              </ode>
+              <torsional>
+                <ode/>
+              </torsional>
+            </friction>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+          </surface>
+          <max_contacts>10</max_contacts>
+        </collision>
+        <visual name='visual'>
+          <cast_shadows>0</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/kitchen.material</uri>
+              <name>Kitchen/CounterTop_H</name>
+            </script>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <physics type='ode'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>1</shadows>
+    </scene>
+    <audio>
+      <device>default</device>
+    </audio>
+    <wind/>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>0</latitude_deg>
+      <longitude_deg>0</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <model name='robot'>
+      <pose>2.6909796107193182 5.214512984558013 0.5 0 0 -0.36024131065666015</pose>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <box>
+              <size>0.65 0.65 1.0</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <box>
+              <size>0.65 0.65 1.0</size>
+            </box>
+          </geometry>
+          <material>
+            <ambient>0.1 0.4 0.8 1</ambient>
+            <diffuse>0.1 0.4 0.8 1</diffuse>
+          </material>
+        </visual>
+        <visual name='robot_top'>
+          <pose>0 0 0.58 0 0 0</pose>
+          <geometry><cylinder><radius>0.23399999999999999</radius><length>0.16</length></cylinder></geometry>
+          <material><ambient>0.04 0.08 0.12 1</ambient><diffuse>0.04 0.08 0.12 1</diffuse></material>
+        </visual>
+        <visual name='robot_front'>
+          <pose>0.273 0 0.44 0 0 0</pose>
+          <geometry><box><size>0.156 0.41600000000000004 0.24</size></box></geometry>
+          <material><ambient>0.9 0.12 0.08 1</ambient><diffuse>0.9 0.12 0.08 1</diffuse></material>
+        </visual>
+        <visual name='robot_sensor'>
+          <pose>0 0 0.78 0 0 0</pose>
+          <geometry><cylinder><radius>0.045500000000000006</radius><length>0.24</length></cylinder></geometry>
+          <material><ambient>0.1 0.9 0.9 1</ambient><diffuse>0.1 0.9 0.9 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <actor name="person_1">
+      <pose>6.146512117682673 7.840609880345407 1.25 0 0 -1.0141860914729226</pose>
+      <skin>
+        <filename>elegant_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_2">
+      <pose>5.324081397635711 6.2112033532690205 1.25 0 0 -1.9465695043965374</pose>
+      <skin>
+        <filename>casual_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_3">
+      <pose>1.8029607699366526 7.705295669459401 1.25 0 0 -0.19912238584205638</pose>
+      <skin>
+        <filename>elegant_woman.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_4">
+      <pose>1.9708881886744145 2.5532920529990664 1.25 0 0 1.2967237636592737</pose>
+      <skin>
+        <filename>regular_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_5">
+      <pose>8.395223022062776 1.8577059584971267 1.25 0 0 1.668149080433596</pose>
+      <skin>
+        <filename>elegant_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <model name="static_object_0">
+      <static>true</static>
+      <pose>7.06552181941876 2.80272625520592 0.45 0 0 -0.5903488443134179</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.48993842698209844 0.48993842698209844 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>1.1205089314712533 1.0346587311478033 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_1">
+      <static>true</static>
+      <pose>3.6995458397598497 6.8109045301832625 0.375 0 0 -1.467852387568377</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.9779995990900704 0.9779995990900704 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>1.3971422844143864 0.5433331106055946 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name='simple_world_test'>
+      <pose>0 0 0 0 -0 0</pose>
+      <static>1</static>
+    </model>
+  </world>
+</sdf>

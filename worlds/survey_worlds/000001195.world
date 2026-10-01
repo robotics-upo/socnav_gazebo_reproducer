@@ -1,0 +1,556 @@
+<?xml version='1.0'?>
+<sdf version='1.7'>
+  <world name='default'>
+    <gui>
+      <camera name='user_camera'>
+        <pose>0.0 0.0 12.994230058561179 0.0 1.5707963267948966 0</pose>
+        <view_controller>orbit</view_controller>
+        <projection_type>perspective</projection_type>
+      </camera>
+    </gui>
+    <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
+      <robot_name>robot</robot_name>
+      <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src4/000001195.json</trajectory_file>
+    </plugin>
+    <light name='sun' type='directional'>
+      <cast_shadows>1</cast_shadows>
+      <pose>0 0 10 0 -0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+      <spot>
+        <inner_angle>0</inner_angle>
+        <outer_angle>0</outer_angle>
+        <falloff>0</falloff>
+      </spot>
+    </light>
+    <model name='ground_plane'>
+      <static>1</static>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>100</mu>
+                <mu2>50</mu2>
+              </ode>
+              <torsional>
+                <ode/>
+              </torsional>
+            </friction>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+          </surface>
+          <max_contacts>10</max_contacts>
+        </collision>
+        <visual name='visual'>
+          <cast_shadows>0</cast_shadows>
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/kitchen.material</uri>
+              <name>Kitchen/CounterTop_H</name>
+            </script>
+          </material>
+        </visual>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+    </model>
+    <gravity>0 0 -9.8</gravity>
+    <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
+    <atmosphere type='adiabatic'/>
+    <physics type='ode'>
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+    <scene>
+      <ambient>0.4 0.4 0.4 1</ambient>
+      <background>0.7 0.7 0.7 1</background>
+      <shadows>1</shadows>
+    </scene>
+    <audio>
+      <device>default</device>
+    </audio>
+    <wind/>
+    <spherical_coordinates>
+      <surface_model>EARTH_WGS84</surface_model>
+      <latitude_deg>0</latitude_deg>
+      <longitude_deg>0</longitude_deg>
+      <elevation>0</elevation>
+      <heading_deg>0</heading_deg>
+    </spherical_coordinates>
+    <model name='robot'>
+      <pose>-2.25879765649866 -1.8364542080703328 0.5 0 0 1.50600434620619</pose>
+      <link name='link'>
+        <collision name='collision'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name='visual'>
+          <geometry>
+            <cylinder>
+              <radius>0.25</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.1 0.4 0.8 1</ambient>
+            <diffuse>0.1 0.4 0.8 1</diffuse>
+          </material>
+        </visual>
+        <visual name='robot_top'>
+          <pose>0 0 0.58 0 0 0</pose>
+          <geometry><cylinder><radius>0.18</radius><length>0.16</length></cylinder></geometry>
+          <material><ambient>0.04 0.08 0.12 1</ambient><diffuse>0.04 0.08 0.12 1</diffuse></material>
+        </visual>
+        <visual name='robot_front'>
+          <pose>0.21 0 0.44 0 0 0</pose>
+          <geometry><box><size>0.12 0.32 0.24</size></box></geometry>
+          <material><ambient>0.9 0.12 0.08 1</ambient><diffuse>0.9 0.12 0.08 1</diffuse></material>
+        </visual>
+        <visual name='robot_sensor'>
+          <pose>0 0 0.78 0 0 0</pose>
+          <geometry><cylinder><radius>0.035</radius><length>0.24</length></cylinder></geometry>
+          <material><ambient>0.1 0.9 0.9 1</ambient><diffuse>0.1 0.9 0.9 1</diffuse></material>
+        </visual>
+      </link>
+    </model>
+    <actor name="person_4">
+      <pose>-2.673197737129955 1.6255226414977684 1.25 0 0 1.6538544354931486</pose>
+      <skin>
+        <filename>elegant_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_1">
+      <pose>-2.708438069439893 -1.380528426357931 1.25 0 0 -0.533821391928187</pose>
+      <skin>
+        <filename>casual_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_2">
+      <pose>1.0808693975859354 -1.765076576351736 1.25 0 0 0.08949894088276703</pose>
+      <skin>
+        <filename>elegant_woman.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_3">
+      <pose>0.38051706864673435 -1.8126446236229485 1.25 0 0 -1.2571221326700124</pose>
+      <skin>
+        <filename>regular_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_12">
+      <pose>0.361523369355786 3.2411207080232067 1.25 0 0 -3.3148926875945204</pose>
+      <skin>
+        <filename>elegant_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <actor name="person_13">
+      <pose>-1.0631350736287963 3.23018018374207 1.25 0 0 -6.0669745204019945</pose>
+      <skin>
+        <filename>casual_man.dae</filename>
+        <scale>1</scale>
+      </skin>
+      <animation name="walking">
+        <filename>07_01-walk.bvh</filename>
+        <scale>1.0</scale>
+      </animation>
+    </actor>
+    <model name="static_object_0">
+      <static>true</static>
+      <pose>1.5994375232845535 0.30988367260209193 0.375 0 0 -1.65872598623638</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.7007136149063271 0.5474039684156562 0.75</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.375 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_KitchenTable_01/meshes/aws_KitchenTable_01_visual.DAE</uri>
+              <scale>1.0010194498661817 0.30411331578647566 0.9359127504697503</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_1">
+      <static>true</static>
+      <pose>-1.0523838589762078 -1.2651331584401486 0.45 0 0 -0.31520412904308603</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.40349202486053154 0.4672674293469431 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>0.9228025252450063 0.9867818054868941 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_2">
+      <static>true</static>
+      <pose>0.7325109646811168 2.6955327920596366 0.45 0 0 -2.588102478568614</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.42146002021359485 0.4409768819883539 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>0.9638960548906754 0.9312610647710142 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_3">
+      <static>true</static>
+      <pose>1.4058018548579119 -0.5142640799425822 0.45 0 0 -1.7611189600591954</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.4967809666874325 0.4423160132729298 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>1.136158095593776 0.934089060697511 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_4">
+      <static>true</static>
+      <pose>-0.15825662374440297 -3.120884974559895 0.45 0 0 -1.7650877074762512</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.4159647426265905 0.41616610205326243 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>0.9513281335396581 0.8788653173205554 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_5">
+      <static>true</static>
+      <pose>-2.2025493922830544 2.4623885498296705 0.45 0 0 0.5512432206151772</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.48337351234842874 0.48080394932674514 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>1.1054947070784358 1.015368415181362 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name="static_object_6">
+      <static>true</static>
+      <pose>-1.2042773015159742 -3.240851930314297 0.45 0 0 1.7568363461244898</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <box>
+              <size>0.424084793135415 0.46750140623401204 0.9</size>
+            </box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <pose>0 0 -0.45 0 0 0</pose>
+          <geometry>
+            <mesh>
+              <uri>model://aws_robomaker_residential_ChairA_01/meshes/aws_ChairA_01_visual.DAE</uri>
+              <scale>0.9698990163650381 0.987275921105838 0.9855514478355241</scale>
+            </mesh>
+          </geometry>
+
+        </visual>
+      </link>
+    </model>
+    <model name='simple_world_test'>
+      <pose>0 0 0 0 -0 0</pose>
+      <link name='Wall_0'>
+        <collision name='Wall_0_Collision'>
+          <geometry>
+            <box>
+              <size>8.0 0.15 2.5</size>
+            </box>
+          </geometry>
+          <pose>0 0 1.25 0 -0 0</pose>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='Wall_0_Visual'>
+          <pose>0 0 1.25 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>8.0 0.15 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+            <ambient>1 1 1 1</ambient>
+          </material>
+          <meta>
+            <layer>0</layer>
+          </meta>
+        </visual>
+        <pose>3.995 0.0 0 0 -0 -1.5707963267948966</pose>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <link name='Wall_1'>
+        <collision name='Wall_1_Collision'>
+          <geometry>
+            <box>
+              <size>8.0 0.15 2.5</size>
+            </box>
+          </geometry>
+          <pose>0 0 1.25 0 -0 0</pose>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='Wall_1_Visual'>
+          <pose>0 0 1.25 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>8.0 0.15 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+            <ambient>1 1 1 1</ambient>
+          </material>
+          <meta>
+            <layer>0</layer>
+          </meta>
+        </visual>
+        <pose>0.0 -3.995 0 0 -0 -3.141592653589793</pose>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <link name='Wall_2'>
+        <collision name='Wall_2_Collision'>
+          <geometry>
+            <box>
+              <size>8.0 0.15 2.5</size>
+            </box>
+          </geometry>
+          <pose>0 0 1.25 0 -0 0</pose>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='Wall_2_Visual'>
+          <pose>0 0 1.25 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>8.0 0.15 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+            <ambient>1 1 1 1</ambient>
+          </material>
+          <meta>
+            <layer>0</layer>
+          </meta>
+        </visual>
+        <pose>-3.995 0.0 0 0 -0 1.5707963267948966</pose>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <link name='Wall_3'>
+        <collision name='Wall_3_Collision'>
+          <geometry>
+            <box>
+              <size>8.0 0.15 2.5</size>
+            </box>
+          </geometry>
+          <pose>0 0 1.25 0 -0 0</pose>
+          <max_contacts>10</max_contacts>
+          <surface>
+            <contact>
+              <ode/>
+            </contact>
+            <bounce/>
+            <friction>
+              <torsional>
+                <ode/>
+              </torsional>
+              <ode/>
+            </friction>
+          </surface>
+        </collision>
+        <visual name='Wall_3_Visual'>
+          <pose>0 0 1.25 0 -0 0</pose>
+          <geometry>
+            <box>
+              <size>8.0 0.15 2.5</size>
+            </box>
+          </geometry>
+          <material>
+            <script>
+              <uri>file://media/materials/scripts/gazebo.material</uri>
+              <name>Gazebo/Grey</name>
+            </script>
+            <ambient>1 1 1 1</ambient>
+          </material>
+          <meta>
+            <layer>0</layer>
+          </meta>
+        </visual>
+        <pose>0.0 3.995 0 0 -0 0.0</pose>
+        <self_collide>0</self_collide>
+        <enable_wind>0</enable_wind>
+        <kinematic>0</kinematic>
+      </link>
+      <static>1</static>
+    </model>
+  </world>
+</sdf>

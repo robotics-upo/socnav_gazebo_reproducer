@@ -5,15 +5,13 @@ import os
 
 def _compute_camera_pose(walls, sequence):
   bounds = []
-  scene_height = 0.0
   wall_axis_x = 0.0
   wall_axis_y = 0.0
   total_wall_length = 0.0
   longest_wall_length = 0.0
   longest_wall_angle = 0.0
 
-  def include_rectangle(x, y, length, width, angle, height, is_circle=False):
-    nonlocal scene_height
+  def include_rectangle(x, y, length, width, angle, is_circle=False):
     if is_circle:
       half_x = half_y = max(length, width) / 2.0
     else:
@@ -22,7 +20,6 @@ def _compute_camera_pose(walls, sequence):
       half_x = (cos_angle * length + sin_angle * width) / 2.0
       half_y = (sin_angle * length + cos_angle * width) / 2.0
     bounds.extend(((x - half_x, y - half_y), (x + half_x, y + half_y)))
-    scene_height = max(scene_height, height)
 
   for wall in walls:
     if len(wall) == 4:
@@ -45,13 +42,10 @@ def _compute_camera_pose(walls, sequence):
         (min(x1, x2) - half_width_x, min(y1, y2) - half_width_y),
         (max(x1, x2) + half_width_x, max(y1, y2) + half_width_y),
       ))
-      scene_height = max(scene_height, 2.5)
 
   objects = next((step.get('objects', []) for step in sequence if step.get('objects', [])), [])
-  object_heights = {"shelf": 1.8, "table": 0.75, "chair": 0.9, "tv": 0.6}
   for obj in objects:
     shape = obj.get('shape', {})
-    object_type = obj.get('type', 'object').lower()
     width = shape.get('width', 0.5)
     length = shape.get('length', width)
     include_rectangle(
@@ -60,7 +54,6 @@ def _compute_camera_pose(walls, sequence):
       length,
       width,
       obj.get('angle', 0.0),
-      object_heights.get(object_type, 0.75),
     )
 
   for step in sequence:
@@ -75,7 +68,6 @@ def _compute_camera_pose(walls, sequence):
         length,
         width,
         robot.get('angle', 0.0),
-        1.0,
         shape.get('type', '').lower() == 'circle',
       )
     for person in step.get('people', []):
@@ -85,7 +77,6 @@ def _compute_camera_pose(walls, sequence):
         0.7,
         0.7,
         person.get('angle', 0.0),
-        2.5,
       )
 
   if not bounds:
@@ -105,7 +96,7 @@ def _compute_camera_pose(walls, sequence):
     span_x / (2.0 * math.tan(horizontal_fov / 2.0)),
     span_y / (2.0 * math.tan(vertical_fov / 2.0)),
   )
-  camera_height = scene_height + max(1.0, camera_distance * 1.05)
+  camera_height = camera_distance
   camera_roll = 0.0
   if total_wall_length:
     axis_strength = math.hypot(wall_axis_x, wall_axis_y)
