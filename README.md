@@ -46,6 +46,34 @@ IDs without a matching JSON, or with matching JSON files in multiple source
 directories, are reported and skipped by default. Use `--first-match` to select
 the first matching JSON path in sorted order for duplicate IDs.
 
+### Launch a range of generated survey worlds
+
+The script `run_survey_worlds.sh` launches a consecutive subset of the generated
+world files found in `src/socnav_gazebo_reproducer/worlds/survey_worlds`.
+
+From the workspace root, run:
+
+```
+./src/socnav_gazebo_reproducer/run_survey_worlds.sh
+```
+
+It will ask for:
+
+- the index of the first world to launch
+- the index of the last world to launch
+
+The script validates the indices, sorts the available `.world` files, and then
+launches each selected world through:
+
+```
+ros2 launch socnav_gazebo_reproducer socnav_gazebo_world.launch.py "world:=<path_to_world>"
+```
+
+This is useful to automatically replay a survey range without manually launching
+one world at a time. The script sources the workspace setup file, checks that
+`ros2` and `setsid` are available, and stops the current launch cleanly before
+continuing to the next world.
+
 ### socnav_plugin
 
 Yhe world builder will add the socnav_plugin to the created world file and specify the `trajectory_file`:
