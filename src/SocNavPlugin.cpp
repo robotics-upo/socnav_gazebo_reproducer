@@ -4,11 +4,13 @@
 #include <iostream>
 #include <map>
 #include <set>
+#include <algorithm>
 #include <cmath>
 #include <filesystem>
 #include <thread>
 #include <chrono>
 #include <csignal>
+#include <utility>
 #include <gazebo/gazebo.hh>
 #include <gazebo/transport/transport.hh>
 #include <gazebo/msgs/msgs.hh>
@@ -22,6 +24,7 @@ struct RobotState {
 };
 struct HumanState {
   int id;
+  int source_id;
   double x, y, theta;
   double speed = 0.0; // linear speed [m/s], computed from consecutive positions
 };
@@ -33,6 +36,12 @@ struct GoalState {
   double pos_threshold = 0.1;
   double angle_threshold = 0.1;
   bool valid = false;
+};
+struct GoalAngleMesh {
+  double angle_threshold = 0.0;
+  std::string uri;
+  std::string model_name;
+  gazebo::physics::ModelPtr model;
 };
 struct SmoothedHumanState {
   double x = 0.0;
@@ -76,8 +85,12 @@ public:
   /// Human models are disabled after this many consecutive missing samples.
   static constexpr size_t kMissingHumanSteps = 5;
   std::set<int> human_ids;
+  std::set<int> source_human_ids;
   std::map<int, size_t> human_last_seen_step;
   std::map<int, bool> human_enabled;
+  std::map<int, std::string> human_model_names;
+  size_t human_slot_count = 0;
+  bool human_slot_count_configured = false;
 
   /// Simulation time at the last OnUpdate call (for dt computation).
   double last_sim_time = -1.0;
@@ -92,11 +105,20 @@ public:
   static constexpr double kAnimationMotionWindow = 0.4; // s
   static constexpr double kAnimationStartSpeed = 0.10; // m/s
   static constexpr double kAnimationStopSpeed = 0.05; // m/s
+  static constexpr double kAnimationInitialScriptTime = 0.25; // s
+  static constexpr double kAngleThresholdHideMargin = M_PI / 18.0; // 10 degrees
+  static constexpr double kHumanTrackSupportWindow = 0.25; // s
+  static constexpr double kHumanTrackClusterDistance = 1.0; //1.2; // m
+  static constexpr size_t kHumanTrackNeighborSteps = 10; //5;
 
   std::string robot_name = "robot";
   gazebo::physics::ModelPtr goal_area_model;
   gazebo::physics::ModelPtr goal_tolerance_model;
   gazebo::physics::ModelPtr goal_direction_model;
+  gazebo::physics::ModelPtr goal_angle_lower_model;
+  gazebo::physics::ModelPtr goal_angle_upper_model;
+  gazebo::physics::ModelPtr goal_angle_chord_model;
+  std::vector<GoalAngleMesh> goal_angle_meshes;
   bool goal_models_requested = false;
 
   // Nodes and publishers for Gazebo Transport
@@ -118,7 +140,9 @@ public:
   void ApplyStep(const TrajectoryStep& step, double dt);
   void ApplyGoal(const GoalState& goal);
   void EnsureGoalModels();
+  void AssignHumanSlots();
   void SetupActorAnimations();
+  gazebo::physics::ModelPtr HumanModel(int slot);
   
   inline double normalizeAngle(double a)
   {
@@ -147,6 +171,35 @@ void SocNavPlugin::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr _sdf)
 
   if (_sdf->HasElement("robot_name")) {
     impl_->robot_name = _sdf->Get<std::string>("robot_name");
+  }
+  if (_sdf->HasElement("human_slots")) {
+    impl_->human_slot_count = static_cast<size_t>(
+      std::max(0, _sdf->Get<int>("human_slots")));
+    impl_->human_slot_count_configured = true;
+  }
+  if (_sdf->HasElement("goal_angle_mesh")) {
+    sdf::ElementPtr mesh_sdf = _sdf->GetElement("goal_angle_mesh");
+    size_t mesh_index = 0;
+    while (mesh_sdf) {
+      if (mesh_sdf->HasElement("angle_threshold") && mesh_sdf->HasElement("uri")) {
+        GoalAngleMesh mesh;
+        mesh.angle_threshold = std::clamp(
+          std::abs(mesh_sdf->Get<double>("angle_threshold")), 0.0, M_PI);
+        mesh.uri = mesh_sdf->Get<std::string>("uri");
+        mesh.model_name = "socnav_goal_angle_sector_" + std::to_string(mesh_index++);
+        std::ifstream mesh_file(mesh.uri);
+        if (!mesh_file.is_open()) {
+          RCLCPP_ERROR(impl_->rosnode->get_logger(),
+            "Could not open goal angle mesh: %s", mesh.uri.c_str());
+        } else {
+          impl_->goal_angle_meshes.push_back(std::move(mesh));
+        }
+      } else {
+        RCLCPP_ERROR(impl_->rosnode->get_logger(),
+          "Each <goal_angle_mesh> must contain <angle_threshold> and <uri>.");
+      }
+      mesh_sdf = mesh_sdf->GetNextElement("goal_angle_mesh");
+    }
   }
 
   impl_->json_path = "";
@@ -213,11 +266,12 @@ void SocNavPlugin::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr _sdf)
           step.goal.valid = true;
         }
       }
-      
       auto& people_json = item["people"];
       for (auto& person_json : people_json) {
         HumanState human;
         human.id = person_json["id"].get<int>();
+        human.source_id = human.id;
+        impl_->source_human_ids.insert(human.source_id);
         human.x = person_json["x"].get<double>();
         human.y = person_json["y"].get<double>();
         human.theta = person_json["angle"].get<double>();
@@ -233,7 +287,9 @@ void SocNavPlugin::Load(gazebo::physics::WorldPtr _world, sdf::ElementPtr _sdf)
     return;
   }
 
-  // Compute per-person speeds from consecutive position differences.
+  impl_->AssignHumanSlots();
+
+  // Compute per-slot speeds from consecutive position differences.
   // Speed is stored in the *later* step (the one it applies to when moving).
   for (size_t si = 1; si < impl_->trajectory_steps.size(); ++si) {
     auto& cur  = impl_->trajectory_steps[si];
@@ -292,6 +348,21 @@ void SocNavPlugin::Reset()
   impl_->last_start_signal_time = -1.0;
   impl_->stop_signal_time = -1.0;
   impl_->actor_script_time.clear();
+  for (int id : impl_->human_ids) {
+    impl_->actor_script_time[id] = SocNavPluginPrivate::kAnimationInitialScriptTime;
+    gazebo::physics::ModelPtr person_model = impl_->HumanModel(id);
+    if (person_model) {
+      ignition::math::Pose3d hidden_pose = person_model->WorldPose();
+      hidden_pose.Pos().Z(-1000.0);
+      person_model->SetWorldPose(hidden_pose);
+      person_model->SetEnabled(false);
+    }
+    impl_->human_enabled[id] = false;
+    gazebo::physics::ActorPtr actor =
+      boost::dynamic_pointer_cast<gazebo::physics::Actor>(person_model);
+    if (actor)
+      actor->SetScriptTime(impl_->actor_script_time[id]);
+  }
   impl_->smoothed_humans.clear();
   for (int id : impl_->human_ids)
     impl_->human_last_seen_step[id] = impl_->trajectory_steps.size();
@@ -311,23 +382,201 @@ void SocNavPluginPrivate::OnRecordStatus(ConstGzStringPtr &_msg)
   }
 }
 
-void SocNavPluginPrivate::SetupActorAnimations()
+void SocNavPluginPrivate::AssignHumanSlots()
 {
-  // Collect all unique person IDs across all trajectory steps
-  std::set<int> ids;
-  for (const auto& step : trajectory_steps) {
-    for (const auto& p : step.people) ids.insert(p.id);
-  }
-  human_ids = ids;
-  for (int id : human_ids) {
-    human_last_seen_step[id] = trajectory_steps.size();
-    human_enabled[id] = true;
+  std::vector<std::vector<bool>> supported;
+  supported.reserve(trajectory_steps.size());
+  for (const auto& step : trajectory_steps)
+    supported.emplace_back(step.people.size(), false);
+
+  for (size_t step_idx = 0; step_idx < trajectory_steps.size(); ++step_idx) {
+    const auto& step = trajectory_steps[step_idx];
+    for (size_t person_idx = 0; person_idx < step.people.size(); ++person_idx) {
+      const auto& person = step.people[person_idx];
+      const size_t first_neighbor = step_idx > kHumanTrackNeighborSteps
+        ? step_idx - kHumanTrackNeighborSteps : 0;
+      const size_t last_neighbor = std::min(
+        trajectory_steps.size() - 1, step_idx + kHumanTrackNeighborSteps);
+      for (size_t neighbor_idx = first_neighbor;
+           neighbor_idx <= last_neighbor && !supported[step_idx][person_idx];
+           ++neighbor_idx) {
+        if (neighbor_idx == step_idx ||
+            std::abs(trajectory_steps[neighbor_idx].timestamp - step.timestamp) >
+              kHumanTrackSupportWindow)
+          continue;
+        for (const auto& neighbor : trajectory_steps[neighbor_idx].people) {
+          if (std::hypot(person.x - neighbor.x, person.y - neighbor.y) <=
+              kHumanTrackClusterDistance) {
+            supported[step_idx][person_idx] = true;
+            break;
+          }
+        }
+      }
+    }
   }
 
-  for (int id : ids) {
-    std::string model_name = "person_" + std::to_string(id);
+  std::vector<std::vector<std::vector<size_t>>> frame_clusters(
+    trajectory_steps.size());
+  size_t inferred_slot_count = 0;
+  for (size_t step_idx = 0; step_idx < trajectory_steps.size(); ++step_idx) {
+    const auto& people = trajectory_steps[step_idx].people;
+    std::vector<size_t> parent(people.size());
+    for (size_t idx = 0; idx < parent.size(); ++idx)
+      parent[idx] = idx;
+    auto find_root = [&parent](size_t idx) {
+      while (parent[idx] != idx) {
+        parent[idx] = parent[parent[idx]];
+        idx = parent[idx];
+      }
+      return idx;
+    };
+
+    for (size_t first = 0; first < people.size(); ++first) {
+      if (!supported[step_idx][first]) continue;
+      for (size_t second = first + 1; second < people.size(); ++second) {
+        if (!supported[step_idx][second] ||
+            std::hypot(people[first].x - people[second].x,
+                       people[first].y - people[second].y) >
+              kHumanTrackClusterDistance)
+          continue;
+        const size_t first_root = find_root(first);
+        const size_t second_root = find_root(second);
+        if (first_root != second_root)
+          parent[second_root] = first_root;
+      }
+    }
+
+    std::map<size_t, std::vector<size_t>> clusters_by_root;
+    for (size_t person_idx = 0; person_idx < people.size(); ++person_idx) {
+      if (supported[step_idx][person_idx])
+        clusters_by_root[find_root(person_idx)].push_back(person_idx);
+    }
+    for (auto& [root, cluster] : clusters_by_root) {
+      (void)root;
+      frame_clusters[step_idx].push_back(std::move(cluster));
+    }
+    inferred_slot_count = std::max(
+      inferred_slot_count, frame_clusters[step_idx].size());
+  }
+
+  if (!human_slot_count_configured)
+    human_slot_count = inferred_slot_count;
+
+  struct SlotState {
+    bool initialized = false;
+    double x = 0.0;
+    double y = 0.0;
+  };
+  std::vector<SlotState> slots(human_slot_count);
+  for (size_t step_idx = 0; step_idx < trajectory_steps.size(); ++step_idx) {
+    auto& step = trajectory_steps[step_idx];
+    const auto& clusters = frame_clusters[step_idx];
+    std::vector<int> cluster_to_slot(clusters.size(), -1);
+    std::vector<bool> slot_assigned(human_slot_count, false);
+
+    struct Match {
+      double distance;
+      size_t cluster_idx;
+      size_t slot_idx;
+    };
+    std::vector<Match> matches;
+    for (size_t cluster_idx = 0; cluster_idx < clusters.size(); ++cluster_idx) {
+      double center_x = 0.0;
+      double center_y = 0.0;
+      for (size_t person_idx : clusters[cluster_idx]) {
+        center_x += step.people[person_idx].x;
+        center_y += step.people[person_idx].y;
+      }
+      center_x /= clusters[cluster_idx].size();
+      center_y /= clusters[cluster_idx].size();
+      for (size_t slot_idx = 0; slot_idx < slots.size(); ++slot_idx) {
+        if (slots[slot_idx].initialized) {
+          matches.push_back({
+            std::hypot(center_x - slots[slot_idx].x,
+                       center_y - slots[slot_idx].y),
+            cluster_idx,
+            slot_idx});
+        }
+      }
+    }
+    std::sort(matches.begin(), matches.end(), [](const Match& lhs, const Match& rhs) {
+      return lhs.distance < rhs.distance;
+    });
+    for (const auto& match : matches) {
+      if (cluster_to_slot[match.cluster_idx] >= 0 || slot_assigned[match.slot_idx])
+        continue;
+      cluster_to_slot[match.cluster_idx] = static_cast<int>(match.slot_idx);
+      slot_assigned[match.slot_idx] = true;
+    }
+
+    for (size_t cluster_idx = 0; cluster_idx < clusters.size(); ++cluster_idx) {
+      if (cluster_to_slot[cluster_idx] >= 0) continue;
+      auto free_slot = std::find(slot_assigned.begin(), slot_assigned.end(), false);
+      if (free_slot == slot_assigned.end()) continue;
+      const size_t slot_idx = static_cast<size_t>(free_slot - slot_assigned.begin());
+      cluster_to_slot[cluster_idx] = static_cast<int>(slot_idx);
+      slot_assigned[slot_idx] = true;
+    }
+
+    std::vector<HumanState> assigned_people;
+    for (size_t cluster_idx = 0; cluster_idx < clusters.size(); ++cluster_idx) {
+      if (cluster_to_slot[cluster_idx] < 0) continue;
+      const size_t slot_idx = static_cast<size_t>(cluster_to_slot[cluster_idx]);
+      const auto& cluster = clusters[cluster_idx];
+      size_t selected_person = cluster.front();
+      if (slots[slot_idx].initialized) {
+        for (size_t person_idx : cluster) {
+          if (std::hypot(step.people[person_idx].x - slots[slot_idx].x,
+                         step.people[person_idx].y - slots[slot_idx].y) <
+              std::hypot(step.people[selected_person].x - slots[slot_idx].x,
+                         step.people[selected_person].y - slots[slot_idx].y))
+            selected_person = person_idx;
+        }
+      }
+      HumanState person = step.people[selected_person];
+      person.id = static_cast<int>(slot_idx);
+      slots[slot_idx] = {true, person.x, person.y};
+      assigned_people.push_back(person);
+    }
+    step.people = std::move(assigned_people);
+  }
+
+  RCLCPP_INFO(rosnode->get_logger(),
+    "Mapped trajectory observations to %zu spatial human slots.", human_slot_count);
+}
+
+gazebo::physics::ModelPtr SocNavPluginPrivate::HumanModel(int slot)
+{
+  const auto model_name = human_model_names.find(slot);
+  if (model_name == human_model_names.end()) return nullptr;
+  return world->ModelByName(model_name->second);
+}
+
+void SocNavPluginPrivate::SetupActorAnimations()
+{
+  human_ids.clear();
+  for (size_t slot = 0; slot < human_slot_count; ++slot)
+    human_ids.insert(static_cast<int>(slot));
+
+  std::set<std::string> assigned_model_names;
+  for (int id : human_ids) {
+    human_last_seen_step[id] = trajectory_steps.size();
+    human_enabled[id] = false;
+    std::string model_name = "person_slot_" + std::to_string(id);
     gazebo::physics::ModelPtr person_model = world->ModelByName(model_name);
+    if (!person_model) {
+      for (const auto& step : trajectory_steps) {
+        const auto person = std::find_if(step.people.begin(), step.people.end(),
+          [id](const HumanState& candidate) { return candidate.id == id; });
+        if (person == step.people.end()) continue;
+        model_name = "person_" + std::to_string(person->source_id);
+        person_model = world->ModelByName(model_name);
+        if (person_model) break;
+      }
+    }
     if (!person_model) continue;
+    human_model_names[id] = model_name;
+    assigned_model_names.insert(model_name);
 
     gazebo::physics::ActorPtr actor =
         boost::dynamic_pointer_cast<gazebo::physics::Actor>(person_model);
@@ -339,11 +588,28 @@ void SocNavPluginPrivate::SetupActorAnimations()
     ti->duration = 1.0;
     actor->SetCustomTrajectory(ti);
 
-    // Initialise the script-time accumulator for this actor
-    actor_script_time[id] = 0.0;
+    actor_script_time[id] = kAnimationInitialScriptTime;
+    actor->SetScriptTime(actor_script_time[id]);
+
+    ignition::math::Pose3d hidden_pose = person_model->WorldPose();
+    hidden_pose.Pos().Z(-1000.0);
+    person_model->SetWorldPose(hidden_pose);
+    person_model->SetEnabled(false);
 
     RCLCPP_INFO(rosnode->get_logger(),
-      "Registered walking animation for actor person_%d", id);
+      "Registered walking animation for actor slot %d (%s)",
+      id, model_name.c_str());
+  }
+
+  for (int source_id : source_human_ids) {
+    const std::string model_name = "person_" + std::to_string(source_id);
+    if (assigned_model_names.count(model_name) > 0) continue;
+    gazebo::physics::ModelPtr unused_model = world->ModelByName(model_name);
+    if (!unused_model) continue;
+    ignition::math::Pose3d hidden_pose = unused_model->WorldPose();
+    hidden_pose.Pos().Z(-1000.0);
+    unused_model->SetWorldPose(hidden_pose);
+    unused_model->SetEnabled(false);
   }
 }
 
@@ -359,7 +625,7 @@ void SocNavPluginPrivate::EnsureGoalModels()
             <material>
               <ambient>0.1 0.8 0.1 1</ambient>
               <diffuse>0.1 0.8 0.1 1</diffuse>
-              <transparency>0.55</transparency>
+              <transparency>0.0</transparency>
             </material>
           </visual>
         </link>
@@ -395,14 +661,56 @@ void SocNavPluginPrivate::EnsureGoalModels()
         </link>
       </model>
     </sdf>)";
+    const std::string angle_lower_sdf_xml = R"(<sdf version='1.6'>
+      <model name='socnav_goal_angle_lower'>
+        <static>true</static>
+        <link name='link'>
+          <visual name='visual'>
+            <pose>0.5 0 0.05 0 0 0</pose>
+            <geometry><box><size>1.0 0.025 0.025</size></box></geometry>
+            <material><ambient>0.1 0.5 0.9 1</ambient><diffuse>0.1 0.5 0.9 1</diffuse></material>
+          </visual>
+        </link>
+      </model>
+    </sdf>)";
+    const std::string angle_upper_sdf_xml = R"(<sdf version='1.6'>
+      <model name='socnav_goal_angle_upper'>
+        <static>true</static>
+        <link name='link'>
+          <visual name='visual'>
+            <pose>0.5 0 0.05 0 0 0</pose>
+            <geometry><box><size>1.0 0.025 0.025</size></box></geometry>
+            <material><ambient>0.1 0.5 0.9 1</ambient><diffuse>0.1 0.5 0.9 1</diffuse></material>
+          </visual>
+        </link>
+      </model>
+    </sdf>)";
+    const std::string angle_chord_sdf_xml = R"(<sdf version='1.6'>
+      <model name='socnav_goal_angle_chord'>
+        <static>true</static>
+        <link name='link'>
+          <visual name='visual'>
+            <geometry><box><size>1.0 0.025 0.025</size></box></geometry>
+            <material><ambient>0.1 0.5 0.9 1</ambient><diffuse>0.1 0.5 0.9 1</diffuse></material>
+          </visual>
+        </link>
+      </model>
+    </sdf>)";
 
     sdf::SDF area_sdf;
     sdf::SDF tolerance_sdf;
     sdf::SDF direction_sdf_data;
+    sdf::SDF angle_lower_sdf;
+    sdf::SDF angle_upper_sdf;
+    sdf::SDF angle_chord_sdf;
     area_sdf.SetFromString(area_sdf_xml);
     tolerance_sdf.SetFromString(tolerance_sdf_xml);
     direction_sdf_data.SetFromString(direction_sdf_xml);
-    if (!area_sdf.Root() || !tolerance_sdf.Root() || !direction_sdf_data.Root()) {
+    angle_lower_sdf.SetFromString(angle_lower_sdf_xml);
+    angle_upper_sdf.SetFromString(angle_upper_sdf_xml);
+    angle_chord_sdf.SetFromString(angle_chord_sdf_xml);
+    if (!area_sdf.Root() || !tolerance_sdf.Root() || !direction_sdf_data.Root() ||
+        !angle_lower_sdf.Root() || !angle_upper_sdf.Root() || !angle_chord_sdf.Root()) {
       RCLCPP_ERROR(rosnode->get_logger(), "Could not parse goal marker SDF.");
       goal_models_requested = true;
       return;
@@ -410,6 +718,31 @@ void SocNavPluginPrivate::EnsureGoalModels()
     world->InsertModelSDF(area_sdf);
     world->InsertModelSDF(tolerance_sdf);
     world->InsertModelSDF(direction_sdf_data);
+    world->InsertModelSDF(angle_lower_sdf);
+    world->InsertModelSDF(angle_upper_sdf);
+    world->InsertModelSDF(angle_chord_sdf);
+    // Blue
+    // "<material><ambient>0.1 0.5 0.9 1</ambient>"
+    // "<diffuse>0.1 0.5 0.9 1</diffuse><transparency>0.65</transparency>"
+    //
+    for (const auto& mesh : goal_angle_meshes) {
+      const std::string sector_sdf_xml =
+        "<sdf version='1.6'><model name='" + mesh.model_name +
+        "'><static>true</static><link name='link'><visual name='visual'>"
+        "<geometry><mesh><uri>file://" + mesh.uri +
+        "</uri><scale>1 1 1</scale></mesh></geometry>"
+        "<material><ambient>1 1 0 1</ambient>"
+        "<diffuse>1 1 0 1</diffuse><transparency>0.0</transparency>"
+        "</material></visual></link></model></sdf>";
+      sdf::SDF sector_sdf;
+      sector_sdf.SetFromString(sector_sdf_xml);
+      if (!sector_sdf.Root()) {
+        RCLCPP_ERROR(rosnode->get_logger(),
+          "Could not parse goal angle mesh model SDF for %s.", mesh.uri.c_str());
+        continue;
+      }
+      world->InsertModelSDF(sector_sdf);
+    }
     goal_models_requested = true;
   }
 
@@ -419,6 +752,16 @@ void SocNavPluginPrivate::EnsureGoalModels()
     goal_tolerance_model = world->ModelByName("socnav_goal_tolerance");
   if (!goal_direction_model)
     goal_direction_model = world->ModelByName("socnav_goal_direction");
+  if (!goal_angle_lower_model)
+    goal_angle_lower_model = world->ModelByName("socnav_goal_angle_lower");
+  if (!goal_angle_upper_model)
+    goal_angle_upper_model = world->ModelByName("socnav_goal_angle_upper");
+  if (!goal_angle_chord_model)
+    goal_angle_chord_model = world->ModelByName("socnav_goal_angle_chord");
+  for (auto& mesh : goal_angle_meshes) {
+    if (!mesh.model)
+      mesh.model = world->ModelByName(mesh.model_name);
+  }
 }
 
 void SocNavPluginPrivate::ApplyGoal(const GoalState& goal)
@@ -429,20 +772,82 @@ void SocNavPluginPrivate::ApplyGoal(const GoalState& goal)
   constexpr double marker_thickness = 0.015;
   const double radius = std::max(0.05, goal.pos_threshold);
   const double footprint_radius = std::max(0.05, goal.robot_footprint_radius);
+  const double position_tolerance_radius =
+    goal.robot_footprint_radius + goal.pos_threshold;
+  const double goal_direction_length =
+    position_tolerance_radius + goal.robot_footprint_radius;
   const double outer_radius = std::max(footprint_radius + 0.1, radius + 0.05);
+  const double angle_tolerance = std::clamp(std::abs(goal.angle_threshold), 0.0, M_PI);
+  const bool show_angle_threshold = angle_tolerance > 0.0 &&
+    angle_tolerance < M_PI - kAngleThresholdHideMargin;
+  const bool show_angle_threshold_chord =
+    show_angle_threshold && angle_tolerance <= M_PI_2;
+  bool sector_model_selected = false;
+  for (auto& mesh : goal_angle_meshes) {
+    if (!mesh.model) continue;
+    const bool selected =
+      std::abs(mesh.angle_threshold - angle_tolerance) <= 1e-9;
+    mesh.model->SetWorldPose(
+      ignition::math::Pose3d(goal.x, goal.y, marker_thickness + 0.03, 0, 0, goal.angle));
+    mesh.model->SetScale(
+      ignition::math::Vector3d(
+        position_tolerance_radius - goal.pos_threshold/2.0, position_tolerance_radius - goal.pos_threshold/2.0, 1.0), true);
+    mesh.model->SetEnabled(selected);
+    sector_model_selected = sector_model_selected || selected;
+  }
+  const double lower_angle = goal.angle - angle_tolerance;
+  const double upper_angle = goal.angle + angle_tolerance;
   if (goal_area_model) {
     goal_area_model->SetWorldPose(
-      ignition::math::Pose3d(goal.x, goal.y, 0.01, 0, 0, 0));
-    goal_area_model->SetScale(ignition::math::Vector3d(outer_radius, outer_radius, 1.0), true);
+      ignition::math::Pose3d(goal.x, goal.y, marker_thickness + marker_thickness / 2.0, 0, 0, 0));
+    goal_area_model->SetScale(
+      ignition::math::Vector3d(goal.robot_footprint_radius,
+        goal.robot_footprint_radius, 1.0), true);
   }
   if (goal_tolerance_model) {
     goal_tolerance_model->SetWorldPose(
-      ignition::math::Pose3d(goal.x, goal.y, marker_thickness + marker_thickness / 2.0, 0, 0, 0));
-    goal_tolerance_model->SetScale(ignition::math::Vector3d(radius, radius, 1.0), true);
+      ignition::math::Pose3d(goal.x, goal.y, marker_thickness / 2.0, 0, 0, 0));
+    goal_tolerance_model->SetScale(
+      ignition::math::Vector3d(position_tolerance_radius,
+        position_tolerance_radius, 1.0), true);
   }
   if (goal_direction_model) {
     goal_direction_model->SetWorldPose(
       ignition::math::Pose3d(goal.x, goal.y, 0.0, 0, 0, goal.angle));
+    goal_direction_model->SetScale(
+      ignition::math::Vector3d(goal_direction_length, 1.0, 1.0), true);
+  }
+  if (goal_angle_lower_model) {
+    goal_angle_lower_model->SetWorldPose(
+      ignition::math::Pose3d(
+        goal.x, goal.y, show_angle_threshold && !sector_model_selected ? 0.0 : -1000.0,
+        0, 0, lower_angle));
+    goal_angle_lower_model->SetScale(
+      ignition::math::Vector3d(outer_radius, 1.0, 1.0), true);
+    goal_angle_lower_model->SetEnabled(show_angle_threshold && !sector_model_selected);
+  }
+  if (goal_angle_upper_model) {
+    goal_angle_upper_model->SetWorldPose(
+      ignition::math::Pose3d(
+        goal.x, goal.y, show_angle_threshold && !sector_model_selected ? 0.0 : -1000.0,
+        0, 0, upper_angle));
+    goal_angle_upper_model->SetScale(
+      ignition::math::Vector3d(outer_radius, 1.0, 1.0), true);
+    goal_angle_upper_model->SetEnabled(show_angle_threshold && !sector_model_selected);
+  }
+  if (goal_angle_chord_model) {
+    const double chord_length = 2.0 * outer_radius * std::sin(angle_tolerance);
+    const double chord_midpoint_radius = outer_radius * std::cos(angle_tolerance);
+    const double chord_yaw = goal.angle + M_PI_2;
+    goal_angle_chord_model->SetWorldPose(ignition::math::Pose3d(
+      goal.x + chord_midpoint_radius * std::cos(goal.angle),
+      goal.y + chord_midpoint_radius * std::sin(goal.angle),
+      show_angle_threshold_chord && !sector_model_selected ? 0.05 : -1000.0,
+      0, 0, chord_yaw));
+    goal_angle_chord_model->SetScale(
+      ignition::math::Vector3d(std::max(0.001, chord_length), 1.0, 1.0), true);
+    goal_angle_chord_model->SetEnabled(
+      show_angle_threshold_chord && !sector_model_selected);
   }
 }
 
@@ -542,15 +947,11 @@ void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
     present_ids.insert(person.id);
 
   for (int id : human_ids) {
-    gazebo::physics::ModelPtr person_model = world->ModelByName("person_" + std::to_string(id));
+    gazebo::physics::ModelPtr person_model = HumanModel(id);
     if (!person_model) continue;
 
     if (present_ids.count(id) > 0) {
       human_last_seen_step[id] = current_step_idx;
-      if (!human_enabled[id]) {
-        person_model->SetEnabled(true);
-        human_enabled[id] = true;
-      }
       continue;
     }
 
@@ -564,6 +965,7 @@ void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
       person_model->SetWorldPose(hidden_pose);
       person_model->SetEnabled(false);
       human_enabled[id] = false;
+      smoothed_humans.erase(id);
     }
   }
 
@@ -580,8 +982,7 @@ void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
 
   // ---- People ----
   for (const auto& person : step.people) {
-    std::string model_name = "person_" + std::to_string(person.id);
-    gazebo::physics::ModelPtr person_model = world->ModelByName(model_name);
+    gazebo::physics::ModelPtr person_model = HumanModel(person.id);
     if (!person_model) continue;
 
     gazebo::physics::ActorPtr actor =
@@ -621,6 +1022,10 @@ void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
     }
 
     person_model->SetWorldPose(pose);
+    if (!human_enabled[person.id]) {
+      person_model->SetEnabled(true);
+      human_enabled[person.id] = true;
+    }
 
     if (actor) {
       smoothed.animation_window_elapsed += dt;

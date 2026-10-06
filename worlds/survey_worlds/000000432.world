@@ -11,6 +11,12 @@
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
       <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src2/000000432.json</trajectory_file>
+      <human_slots>6</human_slots>
+      <goal_angle_mesh>
+        <angle_threshold>0.1</angle_threshold>
+        <uri>/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/meshes/000000432_goal_angle_00.stl</uri>
+      </goal_angle_mesh>
+
     </plugin>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
@@ -139,8 +145,8 @@
         </visual>
       </link>
     </model>
-    <actor name="person_1">
-      <pose>2.7873303242297944 4.392844941482126 1.25 0 0 -0.9572635465950877</pose>
+    <actor name="person_slot_0">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_man.dae</filename>
         <scale>1</scale>
@@ -150,8 +156,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_2">
-      <pose>9.057476011746951 5.270500719534543 1.25 0 0 2.934981195088061</pose>
+    <actor name="person_slot_1">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>casual_man.dae</filename>
         <scale>1</scale>
@@ -161,8 +167,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_3">
-      <pose>3.646539681293267 2.9142978355782305 1.25 0 0 1.2353422566799905</pose>
+    <actor name="person_slot_2">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_woman.dae</filename>
         <scale>1</scale>
@@ -172,8 +178,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_4">
-      <pose>6.878446581507154 3.7603759456799453 1.25 0 0 -0.7485866049200406</pose>
+    <actor name="person_slot_3">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>regular_man.dae</filename>
         <scale>1</scale>
@@ -183,8 +189,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_5">
-      <pose>3.7746423787989656 8.2184516013018 1.25 0 0 -1.0285229695017788</pose>
+    <actor name="person_slot_4">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_man.dae</filename>
         <scale>1</scale>
@@ -194,8 +200,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_6">
-      <pose>6.698910568191623 5.429182142319954 1.25 0 0 -2.6257932683862006</pose>
+    <actor name="person_slot_5">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>casual_man.dae</filename>
         <scale>1</scale>

@@ -11,6 +11,12 @@
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
       <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src1/000000300.json</trajectory_file>
+      <human_slots>4</human_slots>
+      <goal_angle_mesh>
+        <angle_threshold>0.1</angle_threshold>
+        <uri>/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/meshes/000000300_goal_angle_00.stl</uri>
+      </goal_angle_mesh>
+
     </plugin>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
@@ -141,8 +147,8 @@
         </visual>
       </link>
     </model>
-    <actor name="person_17">
-      <pose>3.621265714782119 1.5758708213160908 1.25 0 0 2.5975517559712946</pose>
+    <actor name="person_slot_0">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_man.dae</filename>
         <scale>1</scale>
@@ -152,8 +158,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_18">
-      <pose>2.1320307963807137 3.515686404207404 1.25 0 0 3.7314551426536737</pose>
+    <actor name="person_slot_1">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>casual_man.dae</filename>
         <scale>1</scale>
@@ -163,8 +169,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_19">
-      <pose>0.30898387080838685 4.94599490498637 1.25 0 0 4.996473317763375</pose>
+    <actor name="person_slot_2">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_woman.dae</filename>
         <scale>1</scale>
@@ -174,8 +180,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_20">
-      <pose>-1.6287286833137404 2.019300924687106 1.25 0 0 5.413600303151821</pose>
+    <actor name="person_slot_3">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>regular_man.dae</filename>
         <scale>1</scale>

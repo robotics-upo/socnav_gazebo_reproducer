@@ -11,6 +11,12 @@
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
       <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src6/000003940.json</trajectory_file>
+      <human_slots>1</human_slots>
+      <goal_angle_mesh>
+        <angle_threshold>0.826331314588</angle_threshold>
+        <uri>/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/meshes/000003940_goal_angle_00.stl</uri>
+      </goal_angle_mesh>
+
     </plugin>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
@@ -141,43 +147,10 @@
         </visual>
       </link>
     </model>
-    <actor name="person_2">
-      <pose>0.10083537115850083 -2.234429903106535 1.25 0 0 2.2082361477781145</pose>
+    <actor name="person_slot_0">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_man.dae</filename>
-        <scale>1</scale>
-      </skin>
-      <animation name="walking">
-        <filename>07_01-walk.bvh</filename>
-        <scale>1.0</scale>
-      </animation>
-    </actor>
-    <actor name="person_3">
-      <pose>0.889881723311527 -0.3707667787563249 1.25 0 0 -0.39050008978788764</pose>
-      <skin>
-        <filename>casual_man.dae</filename>
-        <scale>1</scale>
-      </skin>
-      <animation name="walking">
-        <filename>07_01-walk.bvh</filename>
-        <scale>1.0</scale>
-      </animation>
-    </actor>
-    <actor name="person_4">
-      <pose>1.3824780949758084 -1.2684051074199263 1.25 0 0 0.6157498499487217</pose>
-      <skin>
-        <filename>elegant_woman.dae</filename>
-        <scale>1</scale>
-      </skin>
-      <animation name="walking">
-        <filename>07_01-walk.bvh</filename>
-        <scale>1.0</scale>
-      </animation>
-    </actor>
-    <actor name="person_1">
-      <pose>0.9959968454895036 -2.388509201183484 1.25 0 0 2.3538558965453698</pose>
-      <skin>
-        <filename>regular_man.dae</filename>
         <scale>1</scale>
       </skin>
       <animation name="walking">

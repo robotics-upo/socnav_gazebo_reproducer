@@ -83,6 +83,10 @@ install(DIRECTORY worlds/
         DESTINATION share/${PROJECT_NAME}/worlds
 )
 
+install(DIRECTORY meshes/
+        DESTINATION share/${PROJECT_NAME}/meshes
+)
+
 # install(DIRECTORY ./
 #         DESTINATION share/${PROJECT_NAME}
 #         FILES_MATCHING PATTERN "*.world"

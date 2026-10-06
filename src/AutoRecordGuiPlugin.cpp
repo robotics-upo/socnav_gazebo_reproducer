@@ -24,6 +24,7 @@ namespace gazebo
       // Subscribe to the topic sent by the WorldPlugin
       this->sub = this->node->Subscribe("~/record_video", &AutoRecordGuiPlugin::OnRecordCmd, this);
       gzmsg << "[AutoRecordGuiPlugin] Subscribed to ~/record_video." << std::endl;
+      QTimer::singleShot(100, this, SLOT(HideSceneDecorations()));
     }
 
     public: virtual ~AutoRecordGuiPlugin() {}
@@ -50,6 +51,26 @@ namespace gazebo
       // Transport callbacks may run outside the Qt GUI thread.  Queue the
       // camera operation so it runs after the GUI has created its camera.
       QMetaObject::invokeMethod(this, "TryPendingCommand", Qt::QueuedConnection);
+    }
+
+    private slots: void HideSceneDecorations()
+    {
+      rendering::UserCameraPtr camera = gui::get_active_camera();
+      if (!camera || !camera->GetScene())
+      {
+        if (++this->decoration_retry_count < 50)
+          QTimer::singleShot(100, this, SLOT(HideSceneDecorations()));
+        return;
+      }
+
+      rendering::ScenePtr scene = camera->GetScene();
+      scene->ShowOrigin(false);
+
+      rendering::LightPtr sun = scene->LightByName("sun");
+      if (sun)
+        sun->ShowVisual(false);
+      else if (++this->decoration_retry_count < 50)
+        QTimer::singleShot(100, this, SLOT(HideSceneDecorations()));
     }
 
     private slots: void TryPendingCommand()
@@ -150,6 +171,7 @@ namespace gazebo
     private: bool stop_pending = false;
     private: bool recording = false;
     private: unsigned int retry_count = 0;
+    private: unsigned int decoration_retry_count = 0;
   };
 
   GZ_REGISTER_GUI_PLUGIN(AutoRecordGuiPlugin)

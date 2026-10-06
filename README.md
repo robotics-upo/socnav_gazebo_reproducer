@@ -42,6 +42,12 @@ python3 src/socnav_gazebo_reproducer/generate_survey_worlds.py \
   --output-dir /path/to/survey_worlds
 ```
 
+World generation also writes the goal angle-threshold sector meshes to
+`src/socnav_gazebo_reproducer/meshes` and records their paths in each world.
+The green sector uses the same radius as the red positional-tolerance circle.
+Regenerate existing worlds after updating the builder so they use the sector
+visuals. Thresholds at or above π are represented by a full disk.
+
 IDs without a matching JSON, or with matching JSON files in multiple source
 directories, are reported and skipped by default. Use `--first-match` to select
 the first matching JSON path in sorted order for duplicate IDs.

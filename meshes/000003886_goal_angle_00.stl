@@ -1,0 +1,30 @@
+solid goal_angle_sector
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0
+      vertex 0.992874341 -0.119166032 0
+      vertex 0.998216996 -0.0596894427 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0
+      vertex 0.998216996 -0.0596894427 0
+      vertex 1 0 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0
+      vertex 1 0 0
+      vertex 0.998216996 0.0596894427 0
+    endloop
+  endfacet
+  facet normal 0 0 1
+    outer loop
+      vertex 0 0 0
+      vertex 0.998216996 0.0596894427 0
+      vertex 0.992874341 0.119166032 0
+    endloop
+  endfacet
+endsolid goal_angle_sector

@@ -2,6 +2,70 @@ import json
 import math
 import sys
 import os
+from pathlib import Path
+from xml.sax.saxutils import escape
+
+HUMAN_SUPPORT_WINDOW = 0.25
+HUMAN_CLUSTER_DISTANCE = 1.2
+HUMAN_NEIGHBOR_STEPS = 5
+GOAL_ANGLE_MESH_SEGMENTS = 96
+
+def _compute_human_slot_count(sequence):
+  supported = [
+    [False] * len(step.get('people', []))
+    for step in sequence
+  ]
+
+  for step_idx, step in enumerate(sequence):
+    timestamp = step.get('timestamp', 0.0)
+    for person_idx, person in enumerate(step.get('people', [])):
+      for neighbor_idx in range(
+          max(0, step_idx - HUMAN_NEIGHBOR_STEPS),
+          min(len(sequence), step_idx + HUMAN_NEIGHBOR_STEPS + 1)):
+        if neighbor_idx == step_idx:
+          continue
+        neighbor_step = sequence[neighbor_idx]
+        if abs(neighbor_step.get('timestamp', 0.0) - timestamp) > HUMAN_SUPPORT_WINDOW:
+          continue
+        if any(
+            math.hypot(
+              person.get('x', 0.0) - neighbor.get('x', 0.0),
+              person.get('y', 0.0) - neighbor.get('y', 0.0),
+            ) <= HUMAN_CLUSTER_DISTANCE
+            for neighbor in neighbor_step.get('people', [])):
+          supported[step_idx][person_idx] = True
+          break
+
+  max_slots = 0
+  for step_idx, step in enumerate(sequence):
+    unclustered = [
+      person
+      for person_idx, person in enumerate(step.get('people', []))
+      if supported[step_idx][person_idx]
+    ]
+    cluster_count = 0
+    while unclustered:
+      cluster = [unclustered.pop()]
+      cluster_count += 1
+      expanded = True
+      while expanded:
+        expanded = False
+        remaining = []
+        for person in unclustered:
+          if any(
+              math.hypot(
+                person.get('x', 0.0) - member.get('x', 0.0),
+                person.get('y', 0.0) - member.get('y', 0.0),
+              ) <= HUMAN_CLUSTER_DISTANCE
+              for member in cluster):
+            cluster.append(person)
+            expanded = True
+          else:
+            remaining.append(person)
+        unclustered = remaining
+    max_slots = max(max_slots, cluster_count)
+
+  return max_slots
 
 def _compute_camera_pose(walls, sequence):
   bounds = []
@@ -109,6 +173,62 @@ def _compute_camera_pose(walls, sequence):
   return (min_x + max_x) / 2.0, (min_y + max_y) / 2.0, camera_height, camera_roll
 
 
+def _goal_angle_thresholds(sequence):
+    thresholds = set()
+    for step in sequence:
+        goal = step.get('goal', {})
+        if not isinstance(goal, dict):
+            continue
+        if not all(key in goal for key in ('x', 'y', 'angle')):
+            continue
+        threshold = abs(float(goal.get('angle_threshold', 0.1)))
+        if not math.isfinite(threshold):
+            raise ValueError("Goal angle thresholds must be finite numbers")
+        thresholds.add(round(min(threshold, math.pi), 12))
+    return sorted(thresholds)
+
+
+def _write_goal_angle_mesh(path, angle_threshold):
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    if angle_threshold >= math.pi:
+        start_angle = 0.0
+        end_angle = 2.0 * math.pi
+    else:
+        start_angle = -angle_threshold
+        end_angle = angle_threshold
+
+    sweep = end_angle - start_angle
+    segment_count = max(
+        4,
+        math.ceil(GOAL_ANGLE_MESH_SEGMENTS * sweep / (2.0 * math.pi)),
+    )
+    points = [
+        (
+            math.cos(start_angle + sweep * index / segment_count),
+            math.sin(start_angle + sweep * index / segment_count),
+        )
+        for index in range(segment_count + 1)
+    ]
+
+    with path.open('w', encoding='ascii') as mesh_file:
+        mesh_file.write("solid goal_angle_sector\n")
+        for index in range(segment_count):
+            x1, y1 = points[index]
+            x2, y2 = points[index + 1]
+            mesh_file.write(
+                "  facet normal 0 0 1\n"
+                "    outer loop\n"
+                "      vertex 0 0 0\n"
+                f"      vertex {x1:.9g} {y1:.9g} 0\n"
+                f"      vertex {x2:.9g} {y2:.9g} 0\n"
+                "    endloop\n"
+                "  endfacet\n"
+            )
+        mesh_file.write("endsolid goal_angle_sector\n")
+
+
 def create_world(json_path, output_path):
     with open(json_path, 'r') as f:
         data = json.load(f)
@@ -121,6 +241,25 @@ def create_world(json_path, output_path):
         sequence = data if isinstance(data, list) else []
 
     camera_x, camera_y, camera_z, camera_roll = _compute_camera_pose(walls, sequence)
+    human_slot_count = _compute_human_slot_count(sequence)
+    output_path = Path(output_path)
+    mesh_dir = Path(__file__).resolve().parent / "meshes"
+    goal_angle_meshes = []
+    for mesh_index, angle_threshold in enumerate(_goal_angle_thresholds(sequence)):
+        if angle_threshold <= 0.0:
+            continue
+        mesh_path = mesh_dir / f"{output_path.stem}_goal_angle_{mesh_index:02d}.stl"
+        _write_goal_angle_mesh(mesh_path, angle_threshold)
+        goal_angle_meshes.append((angle_threshold, mesh_path.resolve()))
+
+    goal_angle_mesh_xml = "".join(
+        f"""      <goal_angle_mesh>
+        <angle_threshold>{angle_threshold:.12g}</angle_threshold>
+        <uri>{escape(str(mesh_path))}</uri>
+      </goal_angle_mesh>
+"""
+        for angle_threshold, mesh_path in goal_angle_meshes
+    )
 
     world_template = f"""<?xml version='1.0'?>
 <sdf version='1.7'>
@@ -135,6 +274,8 @@ def create_world(json_path, output_path):
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
       <trajectory_file>{json_path}</trajectory_file>
+      <human_slots>{human_slot_count}</human_slots>
+{goal_angle_mesh_xml}
     </plugin>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
@@ -293,28 +434,18 @@ def create_world(json_path, output_path):
 """
 
         ################################################
-        # Add people models based on the first step in the sequence
+        # Add a fixed model pool sized by supported concurrent occupancy.
         ################################################
-        people = []
-        for step in sequence:
-            if step.get('people', []):
-                people = step['people']
-                break
-
         skin_filenames = (
             "elegant_man.dae",
             "casual_man.dae",
             "elegant_woman.dae",
             "regular_man.dae",
         )
-        for person_idx, p in enumerate(people):
-            pid = p.get('id', 0)
-            px = p.get('x', 0.0)
-            py = p.get('y', 0.0)
-            ptheta = p.get('angle', 0.0)
+        for person_idx in range(human_slot_count):
             skin_filename = skin_filenames[person_idx % len(skin_filenames)]
-            world_template += f"""    <actor name="person_{pid}">
-      <pose>{px} {py} 1.25 0 0 {ptheta}</pose>
+            world_template += f"""    <actor name="person_slot_{person_idx}">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>{skin_filename}</filename>
         <scale>1</scale>

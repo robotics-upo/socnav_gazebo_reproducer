@@ -11,6 +11,8 @@
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
       <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src3/000001022.json</trajectory_file>
+      <human_slots>2</human_slots>
+
     </plugin>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
@@ -141,8 +143,8 @@
         </visual>
       </link>
     </model>
-    <actor name="person_10058">
-      <pose>-2.783751444069864 -4.134422188557289 1.25 0 0 -2.2036434620788827</pose>
+    <actor name="person_slot_0">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_man.dae</filename>
         <scale>1</scale>
@@ -152,8 +154,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_1077">
-      <pose>1.2532605117932527 -1.61897418586681 1.25 0 0 -0.8774636939106946</pose>
+    <actor name="person_slot_1">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>casual_man.dae</filename>
         <scale>1</scale>

@@ -11,6 +11,12 @@
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
       <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src1/000000099.json</trajectory_file>
+      <human_slots>0</human_slots>
+      <goal_angle_mesh>
+        <angle_threshold>0.1</angle_threshold>
+        <uri>/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/meshes/000000099_goal_angle_00.stl</uri>
+      </goal_angle_mesh>
+
     </plugin>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
@@ -141,28 +147,6 @@
         </visual>
       </link>
     </model>
-    <actor name="person_17">
-      <pose>-0.3812801623843045 1.8293400272219462 1.25 0 0 6.02159457735392</pose>
-      <skin>
-        <filename>elegant_man.dae</filename>
-        <scale>1</scale>
-      </skin>
-      <animation name="walking">
-        <filename>07_01-walk.bvh</filename>
-        <scale>1.0</scale>
-      </animation>
-    </actor>
-    <actor name="person_18">
-      <pose>0.445848644977373 0.20512466938014168 1.25 0 0 0.7206417106073505</pose>
-      <skin>
-        <filename>casual_man.dae</filename>
-        <scale>1</scale>
-      </skin>
-      <animation name="walking">
-        <filename>07_01-walk.bvh</filename>
-        <scale>1.0</scale>
-      </animation>
-    </actor>
     <model name="static_object_0">
       <static>true</static>
       <pose>2.2117999999999998 7.328799999999999 0.9 0 0 -1.0500036732051035</pose>

@@ -11,6 +11,8 @@
     <plugin name="socnav_plugin" filename="libSocNavPlugin.so">
       <robot_name>robot</robot_name>
       <trajectory_file>/home/hunav_gz_classic_ws/SocNav3_trajectories/src3/000000997.json</trajectory_file>
+      <human_slots>3</human_slots>
+
     </plugin>
     <light name='sun' type='directional'>
       <cast_shadows>1</cast_shadows>
@@ -141,8 +143,8 @@
         </visual>
       </link>
     </model>
-    <actor name="person_334">
-      <pose>-2.6229774927605747 4.376788930227935 1.25 0 0 -0.8025839283552664</pose>
+    <actor name="person_slot_0">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_man.dae</filename>
         <scale>1</scale>
@@ -152,8 +154,8 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_335">
-      <pose>-1.5945922674285282 -2.245402924024092 1.25 0 0 -2.155264163269377</pose>
+    <actor name="person_slot_1">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>casual_man.dae</filename>
         <scale>1</scale>
@@ -163,21 +165,10 @@
         <scale>1.0</scale>
       </animation>
     </actor>
-    <actor name="person_336">
-      <pose>-1.6803349894745918 -2.022077249000251 1.25 0 0 0.9768208372269959</pose>
+    <actor name="person_slot_2">
+      <pose>0 0 -1000 0 0 0</pose>
       <skin>
         <filename>elegant_woman.dae</filename>
-        <scale>1</scale>
-      </skin>
-      <animation name="walking">
-        <filename>07_01-walk.bvh</filename>
-        <scale>1.0</scale>
-      </animation>
-    </actor>
-    <actor name="person_2328">
-      <pose>1.1588400105886452 -2.3080257047029136 1.25 0 0 -2.9209165556276027</pose>
-      <skin>
-        <filename>regular_man.dae</filename>
         <scale>1</scale>
       </skin>
       <animation name="walking">
