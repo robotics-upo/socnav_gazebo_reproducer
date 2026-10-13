@@ -2,6 +2,7 @@ import json
 import math
 import sys
 import os
+import statistics
 from pathlib import Path
 from xml.sax.saxutils import escape
 
@@ -9,6 +10,11 @@ HUMAN_SUPPORT_WINDOW = 0.25
 HUMAN_CLUSTER_DISTANCE = 1.2
 HUMAN_NEIGHBOR_STEPS = 5
 GOAL_ANGLE_MESH_SEGMENTS = 96
+CAMERA_OUTLIER_MIN_DISTANCE = 2.0
+CAMERA_OUTLIER_GEOMETRY_FRACTION = 0.25
+CAMERA_OUTLIER_MIN_SPEED = 3.0
+CAMERA_ORIENTATION_STEPS = 180
+CAMERA_HUMAN_FOOTPRINT = 0.7
 
 def _compute_human_slot_count(sequence):
   supported = [
@@ -67,110 +73,371 @@ def _compute_human_slot_count(sequence):
 
   return max_slots
 
-def _compute_camera_pose(walls, sequence):
-  bounds = []
-  wall_axis_x = 0.0
-  wall_axis_y = 0.0
-  total_wall_length = 0.0
-  longest_wall_length = 0.0
-  longest_wall_angle = 0.0
+def _rectangle_corners(x, y, length, width, angle):
+  half_length = length / 2.0
+  half_width = width / 2.0
+  cos_angle = math.cos(angle)
+  sin_angle = math.sin(angle)
+  return [
+    (
+      x + local_x * cos_angle - local_y * sin_angle,
+      y + local_x * sin_angle + local_y * cos_angle,
+    )
+    for local_x, local_y in (
+      (-half_length, -half_width),
+      (-half_length, half_width),
+      (half_length, -half_width),
+      (half_length, half_width),
+    )
+  ]
 
-  def include_rectangle(x, y, length, width, angle, is_circle=False):
-    if is_circle:
-      half_x = half_y = max(length, width) / 2.0
-    else:
-      cos_angle = abs(math.cos(angle))
-      sin_angle = abs(math.sin(angle))
-      half_x = (cos_angle * length + sin_angle * width) / 2.0
-      half_y = (sin_angle * length + cos_angle * width) / 2.0
-    bounds.extend(((x - half_x, y - half_y), (x + half_x, y + half_y)))
 
+def _convex_hull(points):
+  points = sorted(set(points))
+  if len(points) <= 1:
+    return points
+
+  def cross(origin, first, second):
+    return (
+      (first[0] - origin[0]) * (second[1] - origin[1])
+      - (first[1] - origin[1]) * (second[0] - origin[0])
+    )
+
+  lower = []
+  for point in points:
+    while len(lower) >= 2 and cross(lower[-2], lower[-1], point) <= 0.0:
+      lower.pop()
+    lower.append(point)
+  upper = []
+  for point in reversed(points):
+    while len(upper) >= 2 and cross(upper[-2], upper[-1], point) <= 0.0:
+      upper.pop()
+    upper.append(point)
+  return lower[:-1] + upper[:-1]
+
+
+def _static_camera_geometry(walls, sequence):
+  geometry = []
   for wall in walls:
-    if len(wall) == 4:
-      x1, y1, x2, y2 = wall
-      length = math.hypot(x2 - x1, y2 - y1)
-      if length:
-        angle = math.atan2(y2 - y1, x2 - x1)
-        wall_axis_x += length * math.cos(2.0 * angle)
-        wall_axis_y += length * math.sin(2.0 * angle)
-        total_wall_length += length
-        if length > longest_wall_length:
-          longest_wall_length = length
-          longest_wall_angle = angle
-      if length:
-        half_width_x = 0.075 * abs(y2 - y1) / length
-        half_width_y = 0.075 * abs(x2 - x1) / length
-      else:
-        half_width_x = half_width_y = 0.075
-      bounds.extend((
-        (min(x1, x2) - half_width_x, min(y1, y2) - half_width_y),
-        (max(x1, x2) + half_width_x, max(y1, y2) + half_width_y),
-      ))
+    if len(wall) != 4:
+      continue
+    x1, y1, x2, y2 = wall
+    length = math.hypot(x2 - x1, y2 - y1)
+    angle = math.atan2(y2 - y1, x2 - x1) if length else 0.0
+    geometry.extend(_rectangle_corners(
+      (x1 + x2) / 2.0,
+      (y1 + y2) / 2.0,
+      length,
+      0.15,
+      angle,
+    ))
 
-  objects = next((step.get('objects', []) for step in sequence if step.get('objects', [])), [])
+  objects = next(
+    (step.get('objects', []) for step in sequence if step.get('objects', [])),
+    [],
+  )
   for obj in objects:
     shape = obj.get('shape', {})
     width = shape.get('width', 0.5)
     length = shape.get('length', width)
-    include_rectangle(
+    geometry.extend(_rectangle_corners(
       obj.get('x', 0.0),
       obj.get('y', 0.0),
       length,
       width,
       obj.get('angle', 0.0),
-    )
+    ))
+  return geometry
 
-  for step in sequence:
-    robot = step.get('robot', {})
-    if robot:
-      shape = robot.get('shape', {})
-      width = shape.get('width', 0.5)
-      length = shape.get('length', width)
-      include_rectangle(
-        robot.get('x', 0.0),
-        robot.get('y', 0.0),
-        length,
-        width,
-        robot.get('angle', 0.0),
-        shape.get('type', '').lower() == 'circle',
+
+def _robot_camera_geometry(robot):
+  shape = robot.get('shape', {})
+  width = shape.get('width', 0.5)
+  length = shape.get('length', width)
+  x = robot.get('x', 0.0)
+  y = robot.get('y', 0.0)
+  angle = robot.get('angle', 0.0)
+  if shape.get('type', '').lower() == 'circle':
+    radius = width / 2.0
+    geometry = [
+      (
+        x + radius * math.cos(2.0 * math.pi * index / 32.0),
+        y + radius * math.sin(2.0 * math.pi * index / 32.0),
       )
+      for index in range(32)
+    ]
+  else:
+    geometry = _rectangle_corners(x, y, length, width, angle)
+  geometry.extend(_rectangle_corners(
+    x + 0.42 * length * math.cos(angle),
+    y + 0.42 * length * math.sin(angle),
+    0.24 * length,
+    0.64 * width,
+    angle,
+  ))
+  return geometry
+
+
+def _distance_to_bounds(point, bounds):
+  min_x, max_x, min_y, max_y = bounds
+  dx = max(min_x - point[0], 0.0, point[0] - max_x)
+  dy = max(min_y - point[1], 0.0, point[1] - max_y)
+  return math.hypot(dx, dy)
+
+
+def _human_camera_outliers(sequence, static_geometry):
+  if any(
+    'timestamp' not in step
+    or not isinstance(step['timestamp'], (int, float))
+    or not math.isfinite(step['timestamp'])
+    for step in sequence
+  ):
+    return set()
+
+  tracks_by_id = {}
+  for step_idx, step in enumerate(sequence):
+    timestamp = step['timestamp']
+    for person_idx, person in enumerate(step.get('people', [])):
+      if 'id' not in person:
+        continue
+      tracks_by_id.setdefault(person['id'], []).append(
+        (step_idx, person_idx, timestamp, person)
+      )
+
+  tracks = []
+  for observations in tracks_by_id.values():
+    segments = []
+    for observation in observations:
+      if (
+        not segments
+        or observation[2] - segments[-1][-1][2] > HUMAN_SUPPORT_WINDOW
+        or observation[2] <= segments[-1][-1][2]
+      ):
+        segments.append([])
+      segments[-1].append(observation)
+    tracks.extend(segments)
+
+  velocities = []
+  for track in tracks:
+    for previous, current in zip(track, track[1:]):
+      delta_time = current[2] - previous[2]
+      if 0.0 < delta_time <= HUMAN_SUPPORT_WINDOW:
+        distance = math.hypot(
+          current[3].get('x', 0.0) - previous[3].get('x', 0.0),
+          current[3].get('y', 0.0) - previous[3].get('y', 0.0),
+        )
+        velocities.append(distance / delta_time)
+
+  if velocities:
+    ordered_speeds = sorted(velocities)
+    # A minority of teleport-like jumps must not inflate the speed baseline.
+    baseline_speeds = ordered_speeds[:max(1, (len(ordered_speeds) + 1) // 2)]
+    median_speed = statistics.median(baseline_speeds)
+    median_deviation = statistics.median(
+      abs(speed - median_speed) for speed in baseline_speeds
+    )
+    speed_limit = max(
+      CAMERA_OUTLIER_MIN_SPEED,
+      median_speed + 6.0 * 1.4826 * median_deviation,
+    )
+  else:
+    speed_limit = CAMERA_OUTLIER_MIN_SPEED
+
+  base_geometry = list(static_geometry)
+  people_geometry = {}
+  for step in sequence:
+    base_geometry.extend(_robot_camera_geometry(step.get('robot', {})))
     for person in step.get('people', []):
-      include_rectangle(
+      if 'id' not in person:
+        continue
+      people_geometry.setdefault(person['id'], []).extend(_rectangle_corners(
         person.get('x', 0.0),
         person.get('y', 0.0),
-        0.7,
-        0.7,
+        CAMERA_HUMAN_FOOTPRINT,
+        CAMERA_HUMAN_FOOTPRINT,
         person.get('angle', 0.0),
+      ))
+
+  base_bounds = (
+    min(point[0] for point in base_geometry),
+    max(point[0] for point in base_geometry),
+    min(point[1] for point in base_geometry),
+    max(point[1] for point in base_geometry),
+  ) if base_geometry else None
+  people_bounds = {
+    person_id: (
+      min(point[0] for point in geometry),
+      max(point[0] for point in geometry),
+      min(point[1] for point in geometry),
+      max(point[1] for point in geometry),
+    )
+    for person_id, geometry in people_geometry.items()
+    if geometry
+  }
+
+  outliers = set()
+  for track in tracks:
+    person_id = track[0][3]['id']
+    reference_bounds = list(base_bounds) if base_bounds else [
+      math.inf, -math.inf, math.inf, -math.inf
+    ]
+    for other_id, other_bounds in people_bounds.items():
+      if other_id == person_id:
+        continue
+      reference_bounds[0] = min(reference_bounds[0], other_bounds[0])
+      reference_bounds[1] = max(reference_bounds[1], other_bounds[1])
+      reference_bounds[2] = min(reference_bounds[2], other_bounds[2])
+      reference_bounds[3] = max(reference_bounds[3], other_bounds[3])
+
+    if not math.isfinite(reference_bounds[0]):
+      continue
+    geometry_diagonal = math.hypot(
+      reference_bounds[1] - reference_bounds[0],
+      reference_bounds[3] - reference_bounds[2],
+    )
+    distance_limit = max(
+      CAMERA_OUTLIER_MIN_DISTANCE,
+      CAMERA_OUTLIER_GEOMETRY_FRACTION * geometry_diagonal,
+    )
+    short_track = track[-1][2] - track[0][2] <= HUMAN_SUPPORT_WINDOW
+
+    for track_idx, (step_idx, person_idx, _, person) in enumerate(track):
+      position = (person.get('x', 0.0), person.get('y', 0.0))
+      if _distance_to_bounds(position, reference_bounds) <= distance_limit:
+        continue
+
+      abrupt_isolated_jump = False
+      if 0 < track_idx < len(track) - 1:
+        previous = track[track_idx - 1]
+        current = track[track_idx]
+        following = track[track_idx + 1]
+        before_dt = current[2] - previous[2]
+        after_dt = following[2] - current[2]
+        if (
+          0.0 < before_dt <= HUMAN_SUPPORT_WINDOW
+          and 0.0 < after_dt <= HUMAN_SUPPORT_WINDOW
+        ):
+          before_speed = math.hypot(
+            current[3].get('x', 0.0) - previous[3].get('x', 0.0),
+            current[3].get('y', 0.0) - previous[3].get('y', 0.0),
+          ) / before_dt
+          after_speed = math.hypot(
+            following[3].get('x', 0.0) - current[3].get('x', 0.0),
+            following[3].get('y', 0.0) - current[3].get('y', 0.0),
+          ) / after_dt
+          abrupt_isolated_jump = (
+            before_speed > speed_limit and after_speed > speed_limit
+          )
+
+      if short_track or abrupt_isolated_jump:
+        outliers.add((step_idx, person_idx))
+
+  return outliers
+
+
+def _compute_camera_pose(walls, sequence):
+  static_geometry = _static_camera_geometry(walls, sequence)
+  human_outliers = _human_camera_outliers(sequence, static_geometry)
+  bounds = list(static_geometry)
+  orientation_candidates = set()
+  objects = next(
+    (step.get('objects', []) for step in sequence if step.get('objects', [])),
+    [],
+  )
+  for obj in objects:
+    angle = obj.get('angle', 0.0)
+    orientation_candidates.add(angle % math.pi)
+
+  for wall in walls:
+    if len(wall) == 4:
+      orientation_candidates.add(
+        math.atan2(wall[3] - wall[1], wall[2] - wall[0]) % math.pi
       )
+
+  for step_idx, step in enumerate(sequence):
+    robot = step.get('robot', {})
+    bounds.extend(_robot_camera_geometry(robot))
+    for person_idx, person in enumerate(step.get('people', [])):
+      if (step_idx, person_idx) in human_outliers:
+        continue
+      angle = person.get('angle', 0.0)
+      bounds.extend(_rectangle_corners(
+        person.get('x', 0.0),
+        person.get('y', 0.0),
+        CAMERA_HUMAN_FOOTPRINT,
+        CAMERA_HUMAN_FOOTPRINT,
+        angle,
+      ))
 
   if not bounds:
     bounds = [(-5.0, -5.0), (5.0, 5.0)]
+  else:
+    # Projection extrema depend only on the convex hull, not interior points.
+    bounds = _convex_hull(bounds)
 
-  min_x = min(point[0] for point in bounds)
-  max_x = max(point[0] for point in bounds)
-  min_y = min(point[1] for point in bounds)
-  max_y = max(point[1] for point in bounds)
-  padding = max(0.15, 0.01 * max(max_x - min_x, max_y - min_y))
-  span_x = max_x - min_x + 2.0 * padding
-  span_y = max_y - min_y + 2.0 * padding
   horizontal_fov = math.radians(60.0)
   aspect_ratio = 16.0 / 9.0
   vertical_fov = 2.0 * math.atan(math.tan(horizontal_fov / 2.0) / aspect_ratio)
-  camera_distance = max(
-    span_x / (2.0 * math.tan(horizontal_fov / 2.0)),
-    span_y / (2.0 * math.tan(vertical_fov / 2.0)),
+  horizontal_scale = 2.0 * math.tan(horizontal_fov / 2.0)
+  vertical_scale = 2.0 * math.tan(vertical_fov / 2.0)
+  padding = max(
+    0.15,
+    0.01 * max(
+      max(point[0] for point in bounds) - min(point[0] for point in bounds),
+      max(point[1] for point in bounds) - min(point[1] for point in bounds),
+    ),
   )
-  camera_height = camera_distance
-  camera_roll = 0.0
-  if total_wall_length:
-    axis_strength = math.hypot(wall_axis_x, wall_axis_y)
-    if axis_strength < 0.05 * total_wall_length:
-      wall_axis_angle = longest_wall_angle
+
+  def frame_at_angle(angle):
+    cos_angle = math.cos(angle)
+    sin_angle = math.sin(angle)
+    projected_x = [
+      point[0] * cos_angle + point[1] * sin_angle
+      for point in bounds
+    ]
+    projected_y = [
+      -point[0] * sin_angle + point[1] * cos_angle
+      for point in bounds
+    ]
+    min_x, max_x = min(projected_x), max(projected_x)
+    min_y, max_y = min(projected_y), max(projected_y)
+    span_x = max_x - min_x + 2.0 * padding
+    span_y = max_y - min_y + 2.0 * padding
+    distance = max(span_x / horizontal_scale, span_y / vertical_scale)
+    center_x = (min_x + max_x) / 2.0
+    center_y = (min_y + max_y) / 2.0
+    world_x = center_x * cos_angle - center_y * sin_angle
+    world_y = center_x * sin_angle + center_y * cos_angle
+    return distance, world_x, world_y
+
+  angle_step = math.pi / CAMERA_ORIENTATION_STEPS
+  sampled_angles = [
+    index * angle_step for index in range(CAMERA_ORIENTATION_STEPS)
+  ]
+  sampled_angles.extend(orientation_candidates)
+  best_angle = min(
+    sampled_angles,
+    key=lambda angle: frame_at_angle(angle)[0],
+  )
+  refine_half_width = angle_step
+  left = best_angle - refine_half_width
+  right = best_angle + refine_half_width
+  golden_ratio = (math.sqrt(5.0) - 1.0) / 2.0
+  first = right - golden_ratio * (right - left)
+  second = left + golden_ratio * (right - left)
+  for _ in range(32):
+    if frame_at_angle(first)[0] <= frame_at_angle(second)[0]:
+      right = second
+      second = first
+      first = right - golden_ratio * (right - left)
     else:
-      wall_axis_angle = 0.5 * math.atan2(wall_axis_y, wall_axis_x)
-    camera_roll = math.pi / 2.0 - wall_axis_angle
-    camera_roll = (camera_roll + math.pi / 2.0) % math.pi - math.pi / 2.0
-  return (min_x + max_x) / 2.0, (min_y + max_y) / 2.0, camera_height, camera_roll
+      left = first
+      first = second
+      second = left + golden_ratio * (right - left)
+  camera_angle = (left + right) / 2.0
+  camera_height, camera_x, camera_y = frame_at_angle(camera_angle)
+  camera_roll = (math.pi / 2.0 - camera_angle + math.pi / 2.0) % math.pi - math.pi / 2.0
+  return camera_x, camera_y, camera_height, camera_roll
 
 
 def _goal_angle_thresholds(sequence):

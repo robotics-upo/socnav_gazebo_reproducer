@@ -10,6 +10,12 @@
 
 namespace gazebo
 {
+  namespace
+  {
+    constexpr unsigned int kVideoWidth = 1560;
+    constexpr unsigned int kVideoHeight = 886;
+  }
+
   class AutoRecordGuiPlugin : public GUIPlugin
   {
     Q_OBJECT
@@ -125,6 +131,12 @@ namespace gazebo
       }
 
       if (!this->start_pending) return;
+
+      camera->SetImageSize(kVideoWidth, kVideoHeight);
+      gzmsg << "[AutoRecordGuiPlugin] Configured video size: "
+            << camera->GetImageWidth() << "x" << camera->GetImageHeight()
+            << " (requested " << kVideoWidth << "x" << kVideoHeight << ")."
+            << std::endl;
 
       // StartVideo writes to Gazebo's temporary encoder buffer. SaveVideo()
       // below copies the finalized stream to the requested output path.

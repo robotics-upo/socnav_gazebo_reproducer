@@ -14,6 +14,25 @@ This python script creates the Gazebo world file (.world) from the environment d
 python3 gazebo_world_builder <path_to_json_file> [path_to_output_world_file]
 ```
 
+The generated top-down camera is framed around the walls, furniture, robot, and
+moving people over the full trajectory. It fits the rotated footprint to the
+existing 60-degree horizontal-FOV and 16:9 assumptions. A person observation is
+ignored for camera framing only when it is both well outside the other scene
+geometry and temporally inconsistent: either an isolated short track or an
+abrupt jump that immediately returns. The simulation trajectory itself is not
+modified. "Well outside" means farther than the larger of 2 m or 25% of the
+reference geometry's bounding-box diagonal. A short track lasts at most 0.25 s;
+an isolated jump must exceed both 3 m/s and six scaled median absolute
+deviations above the lower-half median track speed, in both directions.
+Consistent tracks remain in the framing even if they lie outside the static
+room/furniture footprint. Human visuals use a 0.7 m footprint because the
+trajectory JSON does not carry actor-mesh dimensions. Run the camera-framing
+tests with:
+
+```
+colcon test --packages-select socnav_gazebo_reproducer --ctest-args -R test_camera_framing
+```
+
 ### Generate worlds from survey CSVs
 
 From the workspace root, preview the worlds selected by the survey CSV files:
@@ -101,3 +120,6 @@ Using the argument `world` to indicate the world file to run.
 ### AutoRecord_guiplugin
 
 There is a second plugin in charge of recording a video (.mp4) of the trajectory. But it is transparent to the user. It is launched along with the gzclient in the launch file. 
+The plugin sets the camera recording size to 1560 × 886 pixels before each
+recording starts. Change `kVideoWidth` and `kVideoHeight` in
+`src/AutoRecordGuiPlugin.cpp` to use a different output size.
