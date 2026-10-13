@@ -83,7 +83,7 @@ public:
   std::map<int, SmoothedHumanState> smoothed_humans;
 
   /// Human models are disabled after this many consecutive missing samples.
-  static constexpr size_t kMissingHumanSteps = 5;
+  static constexpr size_t kMissingHumanSteps = 10;
   std::set<int> human_ids;
   std::set<int> source_human_ids;
   std::map<int, size_t> human_last_seen_step;
