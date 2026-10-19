@@ -29,12 +29,31 @@ fi
 
 stop_current_launch() {
   if [[ -n "$launch_pid" ]]; then
+    trap '' INT
     kill -INT -- "-$launch_pid" 2>/dev/null || kill -INT "$launch_pid" 2>/dev/null || true
+    sleep 0.5
+    kill -TERM -- "-$launch_pid" 2>/dev/null || kill -TERM "$launch_pid" 2>/dev/null || true
+    sleep 0.5
+    if kill -0 -- "-$launch_pid" 2>/dev/null; then
+      kill -KILL -- "-$launch_pid" 2>/dev/null || true
+    fi
     wait "$launch_pid" 2>/dev/null || true
     launch_pid=""
   fi
 }
-trap stop_current_launch INT TERM EXIT
+handle_interrupt() {
+  stop_current_launch
+  printf '\nInterrupted; stopping survey-world playback.\n' >&2
+  exit 130
+}
+handle_termination() {
+  trap - TERM
+  stop_current_launch
+  exit 143
+}
+trap handle_interrupt INT
+trap handle_termination TERM
+trap stop_current_launch EXIT
 
 read -r -p 'Index of the first world: ' first_input
 read -r -p 'Index of the last world: ' last_input

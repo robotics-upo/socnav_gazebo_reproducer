@@ -71,10 +71,11 @@ IDs without a matching JSON, or with matching JSON files in multiple source
 directories, are reported and skipped by default. Use `--first-match` to select
 the first matching JSON path in sorted order for duplicate IDs.
 
-### Launch a range of generated survey worlds
+### Launch a range of generated survey worlds and recording
 
 The script `run_survey_worlds.sh` launches a consecutive subset of the generated
-world files found in `src/socnav_gazebo_reproducer/worlds/survey_worlds`.
+world files found in `src/socnav_gazebo_reproducer/worlds/survey_worlds`. The Gazebo
+simulation is automatically recorded and stored in a mp4 file. 
 
 From the workspace root, run:
 
