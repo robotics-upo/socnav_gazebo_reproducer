@@ -4,9 +4,15 @@ set -o pipefail
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 WORKSPACE_ROOT=$(cd -- "$SCRIPT_DIR/../.." && pwd)
-WORLD_DIR="$SCRIPT_DIR/worlds/survey_worlds"
+DEFAULT_WORLD_DIR="$SCRIPT_DIR/worlds/survey_worlds"
+WORLD_DIR="${1:-$DEFAULT_WORLD_DIR}"
 SETUP_FILE="$WORKSPACE_ROOT/install/setup.bash"
 launch_pid=""
+
+if (( $# > 1 )); then
+  printf 'Usage: %s [WORLD_DIR]\n' "${0##*/}" >&2
+  exit 2
+fi
 
 if [[ ! -f "$SETUP_FILE" ]]; then
   printf 'Workspace setup file not found: %s\n' "$SETUP_FILE" >&2

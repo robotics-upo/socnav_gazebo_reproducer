@@ -71,6 +71,26 @@ IDs without a matching JSON, or with matching JSON files in multiple source
 directories, are reported and skipped by default. Use `--first-match` to select
 the first matching JSON path in sorted order for duplicate IDs.
 
+### Generate worlds from a trajectory directory
+
+To generate a world for every JSON file directly in `SocNav3_trajectories/src0`,
+run:
+
+```
+python3 src/socnav_gazebo_reproducer/generate_polito_worlds.py --dry-run
+```
+
+Run without `--dry-run` to generate the worlds in
+`src/socnav_gazebo_reproducer/worlds/survey_worlds/polito_worlds`, using each
+trajectory's filename stem for its `.world` file. Override either directory with
+`--input-dir` or `--output-dir`:
+
+```
+python3 src/socnav_gazebo_reproducer/generate_polito_worlds.py \
+  --input-dir /path/to/trajectory_jsons \
+  --output-dir /path/to/polito_worlds
+```
+
 ### Launch a range of generated survey worlds and recording
 
 The script `run_survey_worlds.sh` launches a consecutive subset of the generated
@@ -81,6 +101,15 @@ From the workspace root, run:
 
 ```
 ./src/socnav_gazebo_reproducer/run_survey_worlds.sh
+```
+
+By default, it reads worlds from
+`src/socnav_gazebo_reproducer/worlds/survey_worlds`. Pass a directory as the
+first argument to use a different set of worlds, for example:
+
+```
+./src/socnav_gazebo_reproducer/run_survey_worlds.sh \
+  /home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/worlds/survey_worlds/polito_worlds
 ```
 
 It will ask for:
