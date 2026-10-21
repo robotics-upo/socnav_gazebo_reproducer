@@ -15,6 +15,8 @@ CAMERA_OUTLIER_GEOMETRY_FRACTION = 0.25
 CAMERA_OUTLIER_MIN_SPEED = 3.0
 CAMERA_ORIENTATION_STEPS = 180
 CAMERA_HUMAN_FOOTPRINT = 0.7
+CAMERA_WALL_HEIGHT = 2.5
+CAMERA_DISTANCE_MARGIN = 1.1
 
 def _compute_human_slot_count(sequence):
   supported = [
@@ -403,7 +405,11 @@ def _compute_camera_pose(walls, sequence):
     min_y, max_y = min(projected_y), max(projected_y)
     span_x = max_x - min_x + 2.0 * padding
     span_y = max_y - min_y + 2.0 * padding
-    distance = max(span_x / horizontal_scale, span_y / vertical_scale)
+    # Wall tops are closer to the camera than the ground footprint, so add their height
+    distance = CAMERA_DISTANCE_MARGIN * max(
+      span_x / horizontal_scale,
+      span_y / vertical_scale,
+    ) + CAMERA_WALL_HEIGHT
     center_x = (min_x + max_x) / 2.0
     center_y = (min_y + max_y) / 2.0
     world_x = center_x * cos_angle - center_y * sin_angle

@@ -129,6 +129,42 @@ one world at a time. The script sources the workspace setup file, checks that
 `ros2` and `setsid` are available, and stops the current launch cleanly before
 continuing to the next world.
 
+### Launch survey worlds in isolated Docker containers
+
+Gazebo sometimes fails to start or does not shut down cleanly, which makes the
+following runs of `run_survey_worlds.sh` fail. The script
+`run_survey_worlds_docker.bash` is meant to be run **on the host** (outside the
+container). It starts a fresh `pmb2_hunavsim` container for every world and
+removes it afterwards, so a failure cannot affect the next worlds.
+
+```
+./src/socnav_gazebo_reproducer/run_survey_worlds_docker.bash [WORLD_DIR]
+```
+
+`WORLD_DIR` is a path **inside the container** (it must start with
+`/home/hunav_gz_classic_ws/`). By default it is
+`/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/worlds/survey_worlds`.
+As in the previous script, it asks for the index of the first and last world.
+
+For each world, the container runs with the same options as
+`run-hunav_gz_classic11_pmb2.bash`, but the image entrypoint is bypassed (no
+workspace compilation or menu). It only sources the ROS, PMB2, Gazebo and
+workspace setup files and runs `ros2 launch socnav_gazebo_reproducer
+socnav_gazebo_world.launch.py`.
+
+A world is reported as failed if any of the following happens:
+
+- the last `Trajectory step X / Y` printed by `socnav_plugin` does not satisfy
+  `X + 20 > Y` (or none is printed), i.e. the trajectory was not fully played
+- the launch exceeds the timeout (`TIMEOUT_SECONDS`, 240 s)
+- the launch exits with a non-zero status
+- the launch ends in less than `MIN_RUNTIME_SECONDS` (10 s)
+- `gzserver` or `gzclient` are still alive after the launch ends (they are
+  killed)
+
+At the end, a summary lists the executed and failed worlds with the reasons.
+The exit code is non-zero if any world failed.
+
 ### socnav_plugin
 
 Yhe world builder will add the socnav_plugin to the created world file and specify the `trajectory_file`:
