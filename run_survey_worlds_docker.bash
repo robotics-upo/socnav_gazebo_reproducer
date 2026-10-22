@@ -11,7 +11,7 @@ HOST_WS=$(cd -- "$SCRIPT_DIR/../.." && pwd)
 IMAGE="pmb2_hunavsim"
 DEFAULT_WORLD_DIR="/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/worlds/survey_worlds"
 WORLD_DIR="${1:-$DEFAULT_WORLD_DIR}"
-TIMEOUT_SECONDS=240
+TIMEOUT_SECONDS=200
 MIN_RUNTIME_SECONDS=10
 LINGERING_EXIT_CODE=99
 CONTAINER_NAME="hunavsim_pmb2_survey_$$"
@@ -53,10 +53,11 @@ cleanup() {
 }
 failed_worlds=()
 executed=0
+world_count=0
 
 print_summary() {
   printf '\n========== Summary ==========\n'
-  printf 'Executed: %d, failed: %d\n' "$executed" "${#failed_worlds[@]}"
+  printf 'Worlds found: %d, executed: %d, failed: %d\n' "$world_count" "$executed" "${#failed_worlds[@]}"
   if (( ${#failed_worlds[@]} > 0 )); then
     printf 'Failed worlds:\n'
     printf '  - %s\n' "${failed_worlds[@]}"
