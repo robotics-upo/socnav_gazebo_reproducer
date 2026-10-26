@@ -851,6 +851,9 @@ void SocNavPluginPrivate::ApplyGoal(const GoalState& goal)
   }
 }
 
+// Seconds of static scenario recorded before the trajectory starts moving
+constexpr double kRecordingLeadInSeconds = 1.5;
+
 void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
 {
   if (!is_loaded || trajectory_steps.empty()) return;
@@ -882,7 +885,9 @@ void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
   last_sim_time = sim_time;
 
   // Hold the first step until the GUI confirms recording, so no frames are lost.
-  if (trajectory_clock_start < 0.0 && (start_ack_received || !record_pub)) {
+  if (trajectory_clock_start < 0.0 &&
+      (!record_pub ||
+       (start_ack_received && sim_time - recording_signal_time >= kRecordingLeadInSeconds))) {
     trajectory_clock_start = sim_time;
     RCLCPP_INFO(rosnode->get_logger(),
       "Trajectory playback starts at sim t=%.2f s.", sim_time);
