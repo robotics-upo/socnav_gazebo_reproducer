@@ -131,6 +131,8 @@ public:
   bool stop_ack_received = false;
   bool shutdown_requested = false;
   double recording_signal_time = -1.0;
+  // Sim time at which the trajectory clock starts (after the video recording is confirmed)
+  double trajectory_clock_start = -1.0;
   double last_start_signal_time = -1.0;
   double stop_signal_time = -1.0;
   std::string json_path;
@@ -345,6 +347,7 @@ void SocNavPlugin::Reset()
   impl_->stop_ack_received = false;
   impl_->shutdown_requested = false;
   impl_->recording_signal_time = -1.0;
+  impl_->trajectory_clock_start = -1.0;
   impl_->last_start_signal_time = -1.0;
   impl_->stop_signal_time = -1.0;
   impl_->actor_script_time.clear();
@@ -355,7 +358,6 @@ void SocNavPlugin::Reset()
       ignition::math::Pose3d hidden_pose = person_model->WorldPose();
       hidden_pose.Pos().Z(-1000.0);
       person_model->SetWorldPose(hidden_pose);
-      person_model->SetEnabled(false);
     }
     impl_->human_enabled[id] = false;
     gazebo::physics::ActorPtr actor =
@@ -594,7 +596,6 @@ void SocNavPluginPrivate::SetupActorAnimations()
     ignition::math::Pose3d hidden_pose = person_model->WorldPose();
     hidden_pose.Pos().Z(-1000.0);
     person_model->SetWorldPose(hidden_pose);
-    person_model->SetEnabled(false);
 
     RCLCPP_INFO(rosnode->get_logger(),
       "Registered walking animation for actor slot %d (%s)",
@@ -609,7 +610,6 @@ void SocNavPluginPrivate::SetupActorAnimations()
     ignition::math::Pose3d hidden_pose = unused_model->WorldPose();
     hidden_pose.Pos().Z(-1000.0);
     unused_model->SetWorldPose(hidden_pose);
-    unused_model->SetEnabled(false);
   }
 }
 
@@ -881,8 +881,13 @@ void SocNavPluginPrivate::OnUpdate(const gazebo::common::UpdateInfo& _info)
   double dt = (last_sim_time < 0.0) ? 0.0 : sim_time - last_sim_time;
   last_sim_time = sim_time;
 
-  // Elapsed time relative to trajectory start
-  double elapsed = sim_time;
+  // Hold the first step until the GUI confirms recording, so no frames are lost.
+  if (trajectory_clock_start < 0.0 && (start_ack_received || !record_pub)) {
+    trajectory_clock_start = sim_time;
+    RCLCPP_INFO(rosnode->get_logger(),
+      "Trajectory playback starts at sim t=%.2f s.", sim_time);
+  }
+  double elapsed = trajectory_clock_start < 0.0 ? 0.0 : sim_time - trajectory_clock_start;
 
   // Advance the step index while the *next* step's relative time has been reached.
   bool step_changed = false;
@@ -963,7 +968,6 @@ void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
       ignition::math::Pose3d hidden_pose = person_model->WorldPose();
       hidden_pose.Pos().Z(-1000.0);
       person_model->SetWorldPose(hidden_pose);
-      person_model->SetEnabled(false);
       human_enabled[id] = false;
       smoothed_humans.erase(id);
     }
@@ -1022,10 +1026,7 @@ void SocNavPluginPrivate::ApplyStep(const TrajectoryStep& step, double dt)
     }
 
     person_model->SetWorldPose(pose);
-    if (!human_enabled[person.id]) {
-      person_model->SetEnabled(true);
-      human_enabled[person.id] = true;
-    }
+    human_enabled[person.id] = true;
 
     if (actor) {
       smoothed.animation_window_elapsed += dt;

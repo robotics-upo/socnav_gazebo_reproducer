@@ -12,7 +12,7 @@ namespace gazebo
 {
   namespace
   {
-    constexpr unsigned int kVideoWidth = 1560;
+    constexpr unsigned int kVideoWidth = 1630;
     constexpr unsigned int kVideoHeight = 886;
   }
 
@@ -132,11 +132,24 @@ namespace gazebo
 
       if (!this->start_pending) return;
 
-      camera->SetImageSize(kVideoWidth, kVideoHeight);
-      gzmsg << "[AutoRecordGuiPlugin] Configured video size: "
-            << camera->GetImageWidth() << "x" << camera->GetImageHeight()
-            << " (requested " << kVideoWidth << "x" << kVideoHeight << ")."
-            << std::endl;
+      // SetImageSize is applied asynchronously by the render thread. Starting the
+      // encoder before it takes effect makes the encoder size differ from the
+      // frame size, so wait until the camera really has the requested size.
+      if (camera->ImageWidth() != kVideoWidth || camera->ImageHeight() != kVideoHeight)
+      {
+        camera->SetImageSize(kVideoWidth, kVideoHeight);
+        if (++this->resize_retry_count < 100)
+        {
+          QTimer::singleShot(100, this, SLOT(TryPendingCommand()));
+          return;
+        }
+        gzerr << "[AutoRecordGuiPlugin] Camera size is "
+              << camera->ImageWidth() << "x" << camera->ImageHeight()
+              << " instead of " << kVideoWidth << "x" << kVideoHeight
+              << "; recording anyway." << std::endl;
+      }
+      gzmsg << "[AutoRecordGuiPlugin] Video size: "
+            << camera->ImageWidth() << "x" << camera->ImageHeight() << std::endl;
 
       // StartVideo writes to Gazebo's temporary encoder buffer. SaveVideo()
       // below copies the finalized stream to the requested output path.
@@ -155,6 +168,7 @@ namespace gazebo
       this->recording = true;
       this->start_pending = false;
       this->retry_count = 0;
+      this->resize_retry_count = 0;
       msgs::GzString status;
       status.set_data("started");
       this->status_pub->Publish(status);
@@ -183,6 +197,7 @@ namespace gazebo
     private: bool stop_pending = false;
     private: bool recording = false;
     private: unsigned int retry_count = 0;
+    private: unsigned int resize_retry_count = 0;
     private: unsigned int decoration_retry_count = 0;
   };
 

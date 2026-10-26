@@ -3,7 +3,7 @@
   <world name='default'>
     <gui>
       <camera name='user_camera'>
-        <pose>5.389745339152417 5.451749540233579 13.403418850269833 -0.14457496343260612 1.5707963267948966 0</pose>
+        <pose>5.389745339152417 5.451749540233579 19.924444505350785 -0.14457496343260612 1.5707963267948966 0</pose>
         <view_controller>orbit</view_controller>
         <projection_type>perspective</projection_type>
       </camera>

@@ -12,7 +12,7 @@ IMAGE="pmb2_hunavsim"
 DEFAULT_WORLD_DIR="/home/hunav_gz_classic_ws/src/socnav_gazebo_reproducer/worlds/survey_worlds"
 WORLD_DIR="${1:-$DEFAULT_WORLD_DIR}"
 TIMEOUT_SECONDS=200
-MIN_RUNTIME_SECONDS=10
+MIN_RUNTIME_SECONDS=6 #10
 LINGERING_EXIT_CODE=99
 CONTAINER_NAME="hunavsim_pmb2_survey_$$"
 
@@ -33,7 +33,7 @@ docker_run() {
     --name "$CONTAINER_NAME" \
     --gpus all \
     --runtime=nvidia \
-    --env="NVIDIA_VISIBLE_DEVICES=none" \
+    --env="NVIDIA_VISIBLE_DEVICES=all" \
     --env="NVIDIA_DRIVER_CAPABILITIES=all" \
     --env="DISPLAY=$DISPLAY" \
     --env="QT_X11_NO_MITSHM=1" \
