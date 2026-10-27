@@ -52,6 +52,8 @@ cleanup() {
   docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
 }
 failed_worlds=()
+# Failures are also appended here as they happen, so they survive a crashed run.
+FAILED_LOG="$SCRIPT_DIR/survey_failed_worlds_$(date +%Y%m%d_%H%M%S).log"
 executed=0
 world_count=0
 
@@ -61,6 +63,7 @@ print_summary() {
   if (( ${#failed_worlds[@]} > 0 )); then
     printf 'Failed worlds:\n'
     printf '  - %s\n' "${failed_worlds[@]}"
+    printf 'Failures also saved in: %s\n' "$FAILED_LOG"
   fi
 }
 
@@ -105,9 +108,11 @@ if (( first_index > last_index || last_index >= world_count )); then
   exit 1
 fi
 
+selected_count=$((last_index - first_index + 1))
 for ((i = first_index; i <= last_index; i++)); do
   world_path=${all_worlds[$i]}
-  printf '\n[%d] Launching %s in a fresh container\n' "$i" "${world_path##*/}"
+  printf '\n===== Running scenario %d/%d =====\n' "$((i - first_index + 1))" "$selected_count"
+  printf '[%d] Launching %s in a fresh container\n' "$i" "${world_path##*/}"
   inner='timeout -s INT -k 15 '"$TIMEOUT_SECONDS"' ros2 launch socnav_gazebo_reproducer socnav_gazebo_world.launch.py "world:=$1"
 rc=$?
 if pgrep -x gzserver >/dev/null || pgrep -x gzclient >/dev/null; then
@@ -152,6 +157,7 @@ exit $rc'
     reason_text=$(IFS=,; printf '%s' "${reasons[*]}")
     printf '\nFAILED: %s (%s, %ds)\n' "${world_path##*/}" "${reason_text//,/, }" "$elapsed" >&2
     failed_worlds+=("[$i] ${world_path##*/} (${reason_text//,/, }; ${elapsed}s)")
+    printf '%s\n' "${failed_worlds[-1]}" >> "$FAILED_LOG"
   fi
 done
 
