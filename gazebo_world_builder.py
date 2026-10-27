@@ -303,9 +303,46 @@ def _human_camera_outliers(sequence, static_geometry):
     )
     short_track = track[-1][2] - track[0][2] <= HUMAN_SUPPORT_WINDOW
 
+    def step_speed(first, second):
+      delta_time = second[2] - first[2]
+      if not 0.0 < delta_time <= HUMAN_SUPPORT_WINDOW:
+        return 0.0
+      return math.hypot(
+        second[3].get('x', 0.0) - first[3].get('x', 0.0),
+        second[3].get('y', 0.0) - first[3].get('y', 0.0),
+      ) / delta_time
+
+    far_flags = [
+      _distance_to_bounds(
+        (observation[3].get('x', 0.0), observation[3].get('y', 0.0)),
+        reference_bounds,
+      ) > distance_limit
+      for observation in track
+    ]
+    # Runs of far samples entered or left through an implausible jump are
+    # simulation blow-ups (e.g. a human launched away and back), not real motion.
+    blowup_indices = set()
+    run_start = None
+    for track_idx, is_far in enumerate(far_flags + [False]):
+      if is_far and run_start is None:
+        run_start = track_idx
+      elif not is_far and run_start is not None:
+        run_end = track_idx - 1
+        enters = run_start > 0 and (
+          step_speed(track[run_start - 1], track[run_start]) > speed_limit
+        )
+        leaves = run_end < len(track) - 1 and (
+          step_speed(track[run_end], track[run_end + 1]) > speed_limit
+        )
+        if enters or leaves:
+          blowup_indices.update(range(run_start, run_end + 1))
+        run_start = None
+
     for track_idx, (step_idx, person_idx, _, person) in enumerate(track):
-      position = (person.get('x', 0.0), person.get('y', 0.0))
-      if _distance_to_bounds(position, reference_bounds) <= distance_limit:
+      if track_idx in blowup_indices:
+        outliers.add((step_idx, person_idx))
+        continue
+      if not far_flags[track_idx]:
         continue
 
       abrupt_isolated_jump = False
